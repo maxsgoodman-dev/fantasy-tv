@@ -19,9 +19,21 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <span className="font-bold">Fantasy TV</span>
         <div className="flex items-center gap-4">
           <span>{profile?.display_name}</span>
-          {profile?.role === 'admin' && <a href="/admin/shows">Admin</a>}
+          {profile?.role === 'admin' && (
+            <a
+              href="/admin/shows"
+              className="rounded-full bg-white px-3 py-1 text-sm font-semibold text-fuchsia-700"
+            >
+              Admin
+            </a>
+          )}
           <form action={logout}>
-            <button type="submit">Log out</button>
+            <button
+              type="submit"
+              className="rounded-full border border-white/60 px-3 py-1 text-sm font-semibold"
+            >
+              Log out
+            </button>
           </form>
         </div>
       </header>
