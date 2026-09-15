@@ -15,14 +15,17 @@ export async function GET(request: Request) {
     { db: { schema: 'fantasy_tv' } }
   )
 
-  const twoHoursFromNow = new Date(Date.now() + 2 * 60 * 60 * 1000)
-  const ninetyMinutesFromNow = new Date(Date.now() + 90 * 60 * 1000)
+  // Hobby-plan Vercel Cron only allows a daily schedule, so this runs once a day
+  // (see vercel.json) rather than every 30 minutes. To still catch anything locking
+  // before the next run, the window is widened to "locks sometime in the next 24
+  // hours" instead of a precise "locks in ~2 hours" check.
+  const twentyFourHoursFromNow = new Date(Date.now() + 24 * 60 * 60 * 1000)
 
   const { data: questions } = await supabase
     .from('weekly_questions')
     .select('id, question_text, lock_at, leagues(name, league_members(user_id))')
-    .gt('lock_at', ninetyMinutesFromNow.toISOString())
-    .lt('lock_at', twoHoursFromNow.toISOString())
+    .gt('lock_at', new Date().toISOString())
+    .lt('lock_at', twentyFourHoursFromNow.toISOString())
 
   const { data: userEmails } = await supabase.auth.admin.listUsers()
 
