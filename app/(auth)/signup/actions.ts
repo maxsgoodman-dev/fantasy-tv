@@ -3,6 +3,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
+import { resend } from '@/lib/email/resend'
+import { welcomeEmail } from '@/lib/email/templates'
 
 const SignupSchema = z.object({
   email: z.string().email(),
@@ -29,5 +31,18 @@ export async function signup(formData: FormData) {
   if (error) {
     return { error: error.message }
   }
+
+  try {
+    const { subject, text } = welcomeEmail(parsed.data.displayName)
+    await resend.emails.send({
+      from: 'Fantasy TV <notify@fantasytv.app>',
+      to: parsed.data.email,
+      subject,
+      text,
+    })
+  } catch {
+    // Don't block signup if the welcome email fails to send.
+  }
+
   redirect('/dashboard')
 }

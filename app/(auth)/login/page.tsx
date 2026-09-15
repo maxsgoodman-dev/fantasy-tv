@@ -1,4 +1,5 @@
 import { login } from './actions'
+import { PasswordInput } from '@/components/password-input'
 
 export default function LoginPage() {
   return (
@@ -11,7 +12,7 @@ export default function LoginPage() {
     >
       <h1 className="text-2xl font-bold">Log in</h1>
       <input name="email" type="email" placeholder="Email" required className="rounded border p-2" />
-      <input name="password" type="password" placeholder="Password" required className="rounded border p-2" />
+      <PasswordInput name="password" placeholder="Password" required />
       <button type="submit" className="rounded bg-fuchsia-600 p-2 font-semibold text-white">
         Log in
       </button>

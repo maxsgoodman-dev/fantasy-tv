@@ -1,3 +1,10 @@
+export function welcomeEmail(displayName: string) {
+  return {
+    subject: `Welcome to Fantasy TV, ${displayName}!`,
+    text: `Hey ${displayName}, your Fantasy TV account is ready. Ask your league's admin for a join code to get started, or create your own leagues if you're an admin.`,
+  }
+}
+
 export function resultsPostedEmail(leagueName: string, episodeNumber: number) {
   return {
     subject: `${leagueName}: Episode ${episodeNumber} results are in!`,
