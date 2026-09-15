@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { logout } from './actions'
+import { Avatar } from '@/components/avatar'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,7 +12,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('display_name, role')
+    .select('display_name, role, avatar_url')
     .eq('id', user.id)
     .single()
 
@@ -27,7 +28,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </a>
         </div>
         <div className="flex items-center gap-4">
-          <span>{profile?.display_name}</span>
+          <a href="/profile" className="flex items-center gap-2">
+            <Avatar url={profile?.avatar_url} name={profile?.display_name} size={28} />
+            <span>{profile?.display_name}</span>
+          </a>
           {profile?.role === 'admin' && (
             <a
               href="/admin/shows"

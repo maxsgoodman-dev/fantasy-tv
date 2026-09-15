@@ -6,6 +6,7 @@ import {
   deleteShow,
   updateSeason,
   deleteSeason,
+  uploadShowImage,
 } from './actions'
 import { DeleteButton } from '@/components/delete-button'
 
@@ -15,7 +16,7 @@ export default async function ShowsPage() {
   const supabase = await createClient()
   const { data: shows } = await supabase
     .from('shows')
-    .select('id, name, description, seasons(id, name, year)')
+    .select('id, name, description, image_url, seasons(id, name, year)')
     .order('name')
 
   return (
@@ -28,7 +29,36 @@ export default async function ShowsPage() {
 
       {shows?.map((show) => (
         <div key={show.id} className="rounded border p-4">
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-start gap-4">
+            {show.image_url ? (
+              <img
+                src={show.image_url}
+                alt={show.name}
+                className="h-20 w-32 rounded object-cover"
+              />
+            ) : (
+              <div className="flex h-20 w-32 items-center justify-center rounded bg-zinc-100 text-xs text-zinc-500">
+                No image
+              </div>
+            )}
+            <form
+              action={async (formData: FormData) => {
+                'use server'
+                await uploadShowImage(show.id, formData)
+              }}
+              className="flex flex-col gap-1"
+            >
+              <input type="file" name="image" accept="image/*" required className="text-xs" />
+              <button
+                type="submit"
+                className="w-fit rounded bg-fuchsia-600 px-2 py-1 text-xs font-semibold text-white"
+              >
+                Upload show image
+              </button>
+            </form>
+          </div>
+
+          <div className="mt-2 flex flex-wrap items-center gap-2">
             <form
               key={`${show.id}:${show.name}:${show.description}`}
               action={updateShow.bind(null, show.id)}

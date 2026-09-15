@@ -47,3 +47,18 @@ export async function deleteSeason(seasonId: string) {
   await supabase.from('seasons').delete().eq('id', seasonId)
   revalidatePath('/admin/shows')
 }
+
+export async function uploadShowImage(showId: string, formData: FormData) {
+  const { supabase } = await requireAdmin()
+  const file = formData.get('image') as File | null
+  if (!file || file.size === 0) return { error: 'No file selected' }
+
+  const ext = file.name.split('.').pop() || 'jpg'
+  const path = `shows/${showId}/${Date.now()}.${ext}`
+  const { error: uploadError } = await supabase.storage.from('media').upload(path, file, { upsert: true })
+  if (uploadError) return { error: uploadError.message }
+
+  const { data } = supabase.storage.from('media').getPublicUrl(path)
+  await supabase.from('shows').update({ image_url: data.publicUrl }).eq('id', showId)
+  revalidatePath('/admin/shows')
+}
