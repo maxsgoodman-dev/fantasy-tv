@@ -7,7 +7,11 @@ export default async function BracketAdminPage({ params }: { params: Promise<{ l
   const { leagueId } = await params
   const supabase = await createClient()
 
-  const { data: league } = await supabase.from('leagues').select('season_id, join_code').eq('id', leagueId).single()
+  const { data: league } = await supabase
+    .from('leagues')
+    .select('name, season_id, join_code')
+    .eq('id', leagueId)
+    .single()
 
   const { data: matchups } = await supabase
     .from('bracket_matchups')
@@ -24,6 +28,10 @@ export default async function BracketAdminPage({ params }: { params: Promise<{ l
 
   return (
     <div className="flex flex-col gap-6">
+      <a href="/admin/leagues" className="text-sm underline">
+        ← Leagues
+      </a>
+      <h1 className="text-2xl font-bold">{league?.name}</h1>
       <p>Join code: <span className="font-mono">{league?.join_code}</span></p>
 
       {(!matchups || matchups.length === 0) && (

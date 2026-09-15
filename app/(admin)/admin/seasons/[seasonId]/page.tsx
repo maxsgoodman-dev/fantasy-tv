@@ -14,6 +14,11 @@ export const dynamic = 'force-dynamic'
 export default async function SeasonPage({ params }: { params: Promise<{ seasonId: string }> }) {
   const { seasonId } = await params
   const supabase = await createClient()
+  const { data: season } = await supabase
+    .from('seasons')
+    .select('name, year, shows(name)')
+    .eq('id', seasonId)
+    .single()
   const [{ data: contestants }, { data: episodes }] = await Promise.all([
     supabase.from('contestants').select('id, name, bio').eq('season_id', seasonId).order('name'),
     supabase
@@ -23,8 +28,16 @@ export default async function SeasonPage({ params }: { params: Promise<{ seasonI
       .order('episode_number'),
   ])
 
+  const show = season?.shows as unknown as { name: string } | null
+
   return (
     <div className="flex flex-col gap-6">
+      <a href="/admin/shows" className="text-sm underline">
+        ← Shows
+      </a>
+      <h1 className="text-2xl font-bold">
+        {show?.name} — {season?.name} {season?.year}
+      </h1>
       <section>
         <h2 className="text-xl font-bold">Cast</h2>
         <ul className="my-2 flex flex-col gap-2">

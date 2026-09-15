@@ -6,8 +6,20 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   await requireAdmin()
   return (
     <div>
-      <nav className="flex gap-4 border-b p-4">
-        <a href="/admin/shows">Shows</a>
+      <nav className="flex flex-wrap items-center gap-4 border-b bg-zinc-50 p-4">
+        <span className="font-bold text-fuchsia-700">Admin</span>
+        <a href="/admin/shows" className="font-medium">
+          Shows &amp; Seasons
+        </a>
+        <a href="/admin/leagues" className="font-medium">
+          Leagues
+        </a>
+        <a href="/admin/leagues/new" className="font-medium">
+          + New League
+        </a>
+        <a href="/dashboard" className="ml-auto font-medium">
+          ← Back to app
+        </a>
       </nav>
       <div className="p-4">{children}</div>
     </div>

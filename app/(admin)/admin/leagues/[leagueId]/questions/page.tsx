@@ -7,7 +7,11 @@ export default async function LeagueQuestionsPage({ params }: { params: Promise<
   const { leagueId } = await params
   const supabase = await createClient()
 
-  const { data: league } = await supabase.from('leagues').select('season_id').eq('id', leagueId).single()
+  const { data: league } = await supabase
+    .from('leagues')
+    .select('name, season_id, join_code')
+    .eq('id', leagueId)
+    .single()
   const { data: episodes } = await supabase
     .from('episodes')
     .select('id, episode_number')
@@ -21,6 +25,13 @@ export default async function LeagueQuestionsPage({ params }: { params: Promise<
 
   return (
     <div className="flex flex-col gap-6">
+      <a href="/admin/leagues" className="text-sm underline">
+        ← Leagues
+      </a>
+      <h1 className="text-2xl font-bold">{league?.name}</h1>
+      <p>
+        Join code: <span className="font-mono">{league?.join_code}</span>
+      </p>
       <ul className="list-disc pl-6">
         {questions?.map((q) => (
           <li key={q.id}>

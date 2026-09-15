@@ -38,5 +38,9 @@ export async function createLeague(formData: FormData) {
     .single()
 
   if (error) return { error: error.message }
-  redirect(`/admin/leagues/${data.id}/bracket`)
+  redirect(
+    format === 'bracket'
+      ? `/admin/leagues/${data.id}/bracket`
+      : `/admin/leagues/${data.id}/questions`
+  )
 }
