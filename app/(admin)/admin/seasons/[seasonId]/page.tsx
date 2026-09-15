@@ -31,6 +31,7 @@ export default async function SeasonPage({ params }: { params: Promise<{ seasonI
           {contestants?.map((c) => (
             <li key={c.id} className="flex flex-wrap items-center gap-2">
               <form
+                key={`${c.id}:${c.name}:${c.bio}`}
                 action={updateContestant.bind(null, c.id, seasonId)}
                 className="flex flex-1 flex-wrap items-center gap-2"
               >
@@ -67,6 +68,7 @@ export default async function SeasonPage({ params }: { params: Promise<{ seasonI
                 ({e.status})
               </a>
               <form
+                key={`${e.id}:${e.episode_number}:${e.air_date}`}
                 action={updateEpisode.bind(null, e.id, seasonId)}
                 className="flex flex-wrap items-center gap-2"
               >

@@ -29,7 +29,11 @@ export default async function ShowsPage() {
       {shows?.map((show) => (
         <div key={show.id} className="rounded border p-4">
           <div className="flex flex-wrap items-center gap-2">
-            <form action={updateShow.bind(null, show.id)} className="flex flex-1 flex-wrap items-center gap-2">
+            <form
+              key={`${show.id}:${show.name}:${show.description}`}
+              action={updateShow.bind(null, show.id)}
+              className="flex flex-1 flex-wrap items-center gap-2"
+            >
               <input
                 name="name"
                 defaultValue={show.name}
@@ -59,7 +63,11 @@ export default async function ShowsPage() {
                 <a className="underline" href={`/admin/seasons/${season.id}`}>
                   {season.name} {season.year}
                 </a>
-                <form action={updateSeason.bind(null, season.id)} className="flex items-center gap-2">
+                <form
+                  key={`${season.id}:${season.name}:${season.year}`}
+                  action={updateSeason.bind(null, season.id)}
+                  className="flex items-center gap-2"
+                >
                   <input
                     name="name"
                     defaultValue={season.name}
