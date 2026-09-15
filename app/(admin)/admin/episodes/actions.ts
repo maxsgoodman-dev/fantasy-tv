@@ -4,6 +4,8 @@ import { requireAdmin } from '@/lib/auth/require-admin'
 import { scoreWeeklyPick } from '@/lib/scoring/weekly'
 import type { WeeklyScoringConfig } from '@/lib/scoring/types'
 import { revalidatePath } from 'next/cache'
+import { resend } from '@/lib/email/resend'
+import { resultsPostedEmail } from '@/lib/email/templates'
 
 export async function addEpisodeEvent(episodeId: string, formData: FormData) {
   const { supabase } = await requireAdmin()
@@ -21,6 +23,42 @@ export async function addEpisodeEvent(episodeId: string, formData: FormData) {
   await resolveWeeklyQuestionsForEpisode(episodeId)
   await supabase.from('episodes').update({ status: 'results_posted' }).eq('id', episodeId)
   revalidatePath(`/admin/episodes/${episodeId}`)
+
+  await sendResultsPostedEmails(episodeId)
+}
+
+async function sendResultsPostedEmails(episodeId: string) {
+  const { supabase } = await requireAdmin()
+  const { data: episode } = await supabase
+    .from('episodes')
+    .select('episode_number')
+    .eq('id', episodeId)
+    .single()
+
+  const { data: leagueMembers } = await supabase
+    .from('weekly_questions')
+    .select('leagues(id, name, league_members(profiles(display_name), user_id))')
+    .eq('episode_id', episodeId)
+
+  const { data: userEmails } = await supabase.auth.admin.listUsers()
+
+  const seen = new Set<string>()
+  for (const row of leagueMembers ?? []) {
+    const league = row.leagues as unknown as {
+      id: string
+      name: string
+      league_members: { user_id: string }[]
+    }
+    for (const member of league.league_members) {
+      const key = `${league.id}:${member.user_id}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      const authUser = userEmails.users.find((u) => u.id === member.user_id)
+      if (!authUser?.email) continue
+      const { subject, text } = resultsPostedEmail(league.name, episode!.episode_number)
+      await resend.emails.send({ from: 'Fantasy TV <notify@fantasytv.app>', to: authUser.email, subject, text })
+    }
+  }
 }
 
 async function resolveWeeklyQuestionsForEpisode(episodeId: string) {
