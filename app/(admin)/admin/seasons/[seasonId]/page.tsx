@@ -9,6 +9,8 @@ import {
 } from '../actions'
 import { DeleteButton } from '@/components/delete-button'
 
+export const dynamic = 'force-dynamic'
+
 export default async function SeasonPage({ params }: { params: Promise<{ seasonId: string }> }) {
   const { seasonId } = await params
   const supabase = await createClient()

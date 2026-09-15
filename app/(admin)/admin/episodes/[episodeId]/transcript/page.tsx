@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { uploadTranscript, approveTranscriptUpload } from './actions'
 
+export const dynamic = 'force-dynamic'
+
 export default async function TranscriptPage({ params }: { params: Promise<{ episodeId: string }> }) {
   const { episodeId } = await params
   const supabase = await createClient()

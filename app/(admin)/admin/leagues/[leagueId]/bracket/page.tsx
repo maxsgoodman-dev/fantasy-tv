@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { seedRoundOne, setMatchupWinner } from './actions'
 
+export const dynamic = 'force-dynamic'
+
 export default async function BracketAdminPage({ params }: { params: Promise<{ leagueId: string }> }) {
   const { leagueId } = await params
   const supabase = await createClient()

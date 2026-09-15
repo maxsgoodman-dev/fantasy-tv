@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { createLeague } from '../actions'
 
+export const dynamic = 'force-dynamic'
+
 export default async function NewLeaguePage() {
   const supabase = await createClient()
   const { data: seasons } = await supabase

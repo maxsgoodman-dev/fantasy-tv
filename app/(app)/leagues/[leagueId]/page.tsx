@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { submitPick, submitBracketPick } from './actions'
 
+export const dynamic = 'force-dynamic'
+
 export default async function LeaguePage({ params }: { params: Promise<{ leagueId: string }> }) {
   const { leagueId } = await params
   const supabase = await createClient()

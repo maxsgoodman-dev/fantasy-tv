@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { addEpisodeEvent } from '../actions'
 
+export const dynamic = 'force-dynamic'
+
 export default async function EpisodeResultsPage({ params }: { params: Promise<{ episodeId: string }> }) {
   const { episodeId } = await params
   const supabase = await createClient()

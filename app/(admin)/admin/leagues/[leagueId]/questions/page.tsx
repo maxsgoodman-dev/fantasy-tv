@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { createWeeklyQuestion } from './actions'
 
+export const dynamic = 'force-dynamic'
+
 export default async function LeagueQuestionsPage({ params }: { params: Promise<{ leagueId: string }> }) {
   const { leagueId } = await params
   const supabase = await createClient()
