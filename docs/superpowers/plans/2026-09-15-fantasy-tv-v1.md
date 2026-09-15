@@ -8,6 +8,8 @@
 
 **Tech Stack:** Next.js 15, TypeScript, Tailwind CSS, Supabase (`@supabase/supabase-js`, `@supabase/ssr`), Vitest, Zod, Resend, Vercel AI SDK + AI Gateway (Claude) for transcript parsing.
 
+**Database hosting note:** The Supabase org is at its 2-project free-tier limit. Rather than upgrade or pause an existing project, Fantasy TV's tables live in a dedicated `fantasy_tv` Postgres schema inside the existing `reality-manager` Supabase project (`project_id: wsmegxfnmkhaailxhuih`), fully isolated from that project's own `public` schema tables (which include unrelated tables also named `leagues`, etc., for a different app). The schema is exposed to the Data API and the Supabase clients are configured to default to it, so every other task in this plan can use bare `.from('table_name')` / `.rpc('function_name')` calls exactly as written — no further schema-qualification needed anywhere outside Tasks 1 and 2.
+
 **Scope note:** Per the spec, bracket matchup winners are recorded by the admin directly (a "post this round's result" action in the bracket admin UI), the same way weekly episode results are admin-entered. This is the concrete implementation of "results come from real-world outcomes the admin posts, not member votes" for both formats — brackets don't derive winners from `episode_events` automatically in v1, since that would require generically correlating free-text event types to specific matchups, which is unnecessary complexity for a first version. Both formats still ultimately trace back to the admin attesting to a real-world result.
 
 ---
@@ -130,6 +132,10 @@ git commit -m "chore: scaffold Next.js app with Tailwind, Supabase, Vitest deps"
 
 `supabase/migrations/0001_init.sql`:
 ```sql
+-- Schema -------------------------------------------------------------------
+create schema if not exists fantasy_tv;
+set search_path to fantasy_tv, public;
+
 -- Profiles ---------------------------------------------------------------
 create table profiles (
   id uuid primary key references auth.users(id) on delete cascade,
@@ -141,21 +147,21 @@ create table profiles (
 
 create function handle_new_user() returns trigger as $$
 begin
-  insert into public.profiles (id, display_name)
+  insert into fantasy_tv.profiles (id, display_name)
   values (new.id, coalesce(new.raw_user_meta_data->>'display_name', split_part(new.email, '@', 1)));
   return new;
 end;
-$$ language plpgsql security definer;
+$$ language plpgsql security definer set search_path = fantasy_tv, public;
 
 create trigger on_auth_user_created
   after insert on auth.users
-  for each row execute procedure handle_new_user();
+  for each row execute procedure fantasy_tv.handle_new_user();
 
 create function is_admin() returns boolean as $$
   select exists (
-    select 1 from profiles where id = auth.uid() and role = 'admin'
+    select 1 from fantasy_tv.profiles where id = auth.uid() and role = 'admin'
   );
-$$ language sql stable security definer;
+$$ language sql stable security definer set search_path = fantasy_tv, public;
 
 -- Shows / Seasons / Contestants / Episodes --------------------------------
 create table shows (
@@ -235,25 +241,25 @@ create table league_members (
 
 create function is_league_member(p_league_id uuid) returns boolean as $$
   select exists (
-    select 1 from league_members
+    select 1 from fantasy_tv.league_members
     where league_id = p_league_id and user_id = auth.uid()
   );
-$$ language sql stable security definer;
+$$ language sql stable security definer set search_path = fantasy_tv, public;
 
 create function join_league_by_code(p_code text) returns uuid as $$
 declare
   v_league_id uuid;
 begin
-  select id into v_league_id from leagues where join_code = p_code;
+  select id into v_league_id from fantasy_tv.leagues where join_code = p_code;
   if v_league_id is null then
     raise exception 'invalid join code';
   end if;
-  insert into league_members (league_id, user_id)
+  insert into fantasy_tv.league_members (league_id, user_id)
   values (v_league_id, auth.uid())
   on conflict do nothing;
   return v_league_id;
 end;
-$$ language plpgsql security definer;
+$$ language plpgsql security definer set search_path = fantasy_tv, public;
 
 -- Weekly vote format ---------------------------------------------------------
 create table weekly_questions (
@@ -398,25 +404,35 @@ create policy "member_bracket_picks_update_own" on member_bracket_picks for upda
     and exists (select 1 from bracket_matchups bm where bm.id = matchup_id and bm.winner_id is null)
   );
 create policy "member_bracket_picks_admin_all" on member_bracket_picks for all using (is_admin()) with check (is_admin());
+
+-- Grants (RLS above still governs row-level access) ------------------------
+grant usage on schema fantasy_tv to anon, authenticated;
+grant all on all tables in schema fantasy_tv to anon, authenticated;
+grant all on all sequences in schema fantasy_tv to anon, authenticated;
+grant execute on all functions in schema fantasy_tv to anon, authenticated;
+alter default privileges in schema fantasy_tv grant all on tables to anon, authenticated;
+
+reset search_path;
 ```
 
-- [ ] **Step 2: Apply the migration to the Supabase project**
+- [ ] **Step 2: Apply the migration to the existing `reality-manager` Supabase project**
 
-Use the Supabase MCP `apply_migration` tool (name: `init`, the SQL above), or if working purely from the CLI:
-```bash
-supabase link --project-ref <your-project-ref>
-supabase db push
+This project already exists (`project_id: wsmegxfnmkhaailxhuih`) — do not create a new project. Use the Supabase MCP `apply_migration` tool with `project_id: wsmegxfnmkhaailxhuih`, `name: fantasy_tv_init`, and the SQL above.
+
+- [ ] **Step 3: Expose the `fantasy_tv` schema to the Data API**
+
+By default PostgREST only exposes the `public` schema. Add `fantasy_tv` to the exposed schema list by running this via the Supabase MCP `execute_sql` tool against `project_id: wsmegxfnmkhaailxhuih`:
+```sql
+alter role authenticator set pgrst.db_schemas = 'public, fantasy_tv';
+notify pgrst, 'reload config';
 ```
 
-- [ ] **Step 3: Verify tables exist**
+- [ ] **Step 4: Verify tables exist**
 
-Use the Supabase MCP `list_tables` tool, or:
-```bash
-supabase db remote list
-```
-Expected: all 13 tables listed (`profiles`, `shows`, `seasons`, `contestants`, `episodes`, `episode_events`, `transcript_uploads`, `leagues`, `league_members`, `weekly_questions`, `member_picks`, `bracket_matchups`, `member_bracket_picks`).
+Use the Supabase MCP `list_tables` tool with `project_id: wsmegxfnmkhaailxhuih`, `schemas: ["fantasy_tv"]`.
+Expected: all 13 tables listed under `fantasy_tv.*` (`profiles`, `shows`, `seasons`, `contestants`, `episodes`, `episode_events`, `transcript_uploads`, `leagues`, `league_members`, `weekly_questions`, `member_picks`, `bracket_matchups`, `member_bracket_picks`), and the existing `public.*` tables (e.g. `public.leagues`) unchanged.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
 git add supabase/migrations/0001_init.sql
@@ -439,10 +455,13 @@ import { createBrowserClient } from '@supabase/ssr'
 export function createClient() {
   return createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { db: { schema: 'fantasy_tv' } }
   )
 }
 ```
+
+Note: `{ db: { schema: 'fantasy_tv' } }` scopes every query from this client to the `fantasy_tv` schema created in Task 1, since Fantasy TV's tables live in a dedicated schema inside the shared `reality-manager` Supabase project rather than that project's `public` schema. `auth.*` calls (`supabase.auth.*`) are unaffected by this setting — Supabase Auth always lives in the `auth` schema regardless of the client's configured `db.schema`.
 
 - [ ] **Step 2: Server client**
 
@@ -471,6 +490,7 @@ export async function createClient() {
           }
         },
       },
+      db: { schema: 'fantasy_tv' },
     }
   )
 }
@@ -2416,7 +2436,8 @@ export async function GET(request: Request) {
 
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { db: { schema: 'fantasy_tv' } }
   )
 
   const twoHoursFromNow = new Date(Date.now() + 2 * 60 * 60 * 1000)
