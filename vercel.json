@@ -1,5 +1,6 @@
 {
   "crons": [
-    { "path": "/api/cron/lock-reminders", "schedule": "0 12 * * *" }
+    { "path": "/api/cron/lock-reminders", "schedule": "0 12 * * *" },
+    { "path": "/api/cron/wiki-check", "schedule": "0 6 * * *" }
   ]
 }

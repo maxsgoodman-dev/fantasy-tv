@@ -18,3 +18,10 @@ export function lockReminderEmail(leagueName: string, questionText: string) {
     text: `Don't forget to lock in your pick for "${questionText}" in ${leagueName} — picks lock within the next day.`,
   }
 }
+
+export function wikiChangesEmail(showName: string, eventCount: number) {
+  return {
+    subject: `${showName}: wiki update found ${eventCount} new event${eventCount === 1 ? '' : 's'}`,
+    text: `The show wiki changed and ${eventCount} suggested scoring event${eventCount === 1 ? '' : 's'} ${eventCount === 1 ? 'is' : 'are'} waiting for review at /admin/wiki-sources.`,
+  }
+}
