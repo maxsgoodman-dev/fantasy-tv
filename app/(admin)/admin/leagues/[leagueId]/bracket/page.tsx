@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { scoreDraftPick, type Elimination } from '@/lib/scoring/survival-draft'
+import { scoreWeeklyLineup } from '@/lib/scoring/weekly-team'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,14 +28,20 @@ export default async function LeagueDraftOverviewPage({
 
   const { data: eliminationEvents } = await supabase
     .from('episode_events')
-    .select('contestant_id, episodes!inner(episode_number, season_id)')
+    .select('contestant_id')
     .eq('event_type', 'eliminated')
-    .eq('episodes.season_id', league!.season_id)
-    .order('episodes(episode_number)', { ascending: true })
+    .in('episode_id', (episodes ?? []).map((e) => e.id))
 
-  const eliminations: Elimination[] = (eliminationEvents ?? []).map((e, i) => ({
+  const eliminatedContestantIds = new Set((eliminationEvents ?? []).map((e) => e.contestant_id))
+
+  const { data: allSeasonEvents } = await supabase
+    .from('contestant_episode_events')
+    .select('contestant_id, points, episodes!inner(season_id)')
+    .eq('episodes.season_id', league!.season_id)
+
+  const seasonEventPoints = (allSeasonEvents ?? []).map((e) => ({
     contestantId: e.contestant_id,
-    round: i + 1,
+    points: e.points,
   }))
 
   const { data: draftPicks } = await supabase
@@ -62,9 +68,9 @@ export default async function LeagueDraftOverviewPage({
       </p>
       <p className="text-sm text-zinc-600">
         This is a season-long draft league — members pick their team themselves (locks when Episode 2
-        airs{draftLockEpisode ? `, ${new Date(draftLockEpisode.air_date).toLocaleString()}` : ''}). There&apos;s
-        no admin setup here: eliminations come from the normal episode results flow, and scores update
-        automatically. Draft status: <strong>{draftLocked ? 'Locked' : 'Open'}</strong>.
+        airs{draftLockEpisode ? `, ${new Date(draftLockEpisode.air_date).toLocaleString()}` : ''}). Log
+        events for each episode from the &quot;Log events&quot; page — points accumulate automatically for
+        every drafted contestant. Draft status: <strong>{draftLocked ? 'Locked' : 'Open'}</strong>.
       </p>
 
       <div className="card flex flex-col gap-4 p-4">
@@ -75,11 +81,11 @@ export default async function LeagueDraftOverviewPage({
             <p className="font-semibold">{m.name}</p>
             <ul className="list-disc pl-6 text-sm">
               {m.picks.map((pick) => {
-                const elim = eliminations.find((e) => e.contestantId === pick.contestantId)
-                const points = scoreDraftPick({ contestantId: pick.contestantId }, eliminations)
+                const isOut = eliminatedContestantIds.has(pick.contestantId)
+                const points = scoreWeeklyLineup([{ contestantId: pick.contestantId }], seasonEventPoints)
                 return (
                   <li key={pick.contestantId}>
-                    {pick.name} — {elim ? `out, round ${elim.round}` : 'still in'} ({points} pts)
+                    {pick.name} — {isOut ? 'eliminated' : 'still in'} ({points} pts)
                   </li>
                 )
               })}

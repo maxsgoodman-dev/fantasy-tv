@@ -3,7 +3,6 @@ import { saveLineup, saveDraft } from './actions'
 import { Avatar } from '@/components/avatar'
 import { TeamPicker } from '@/components/team-picker'
 import { scoreWeeklyLineup } from '@/lib/scoring/weekly-team'
-import { scoreDraftPick, type Elimination } from '@/lib/scoring/survival-draft'
 
 export const dynamic = 'force-dynamic'
 
@@ -140,7 +139,9 @@ export default async function LeaguePage({ params }: { params: Promise<{ leagueI
     )
   }
 
-  // Survival draft format ("bracket")
+  // Season draft format ("bracket"): drafted once, scored from the same
+  // kind of stackable per-episode event log as the weekly-team format —
+  // just summed across the whole season instead of one episode at a time.
   const draftLockEpisode = episodes?.find((e) => e.episode_number === 2)
   const draftLocked = draftLockEpisode ? draftLockEpisode.air_date <= new Date().toISOString() : false
 
@@ -152,14 +153,20 @@ export default async function LeaguePage({ params }: { params: Promise<{ leagueI
 
   const { data: eliminationEvents } = await supabase
     .from('episode_events')
-    .select('contestant_id, episodes!inner(episode_number, season_id)')
+    .select('contestant_id')
     .eq('event_type', 'eliminated')
-    .eq('episodes.season_id', league!.season_id)
-    .order('episodes(episode_number)', { ascending: true })
+    .in('episode_id', (episodes ?? []).map((e) => e.id))
 
-  const eliminations: Elimination[] = (eliminationEvents ?? []).map((e, i) => ({
+  const eliminatedContestantIds = new Set((eliminationEvents ?? []).map((e) => e.contestant_id))
+
+  const { data: allSeasonEvents } = await supabase
+    .from('contestant_episode_events')
+    .select('contestant_id, points, episodes!inner(season_id)')
+    .eq('episodes.season_id', league!.season_id)
+
+  const seasonEventPoints = (allSeasonEvents ?? []).map((e) => ({
     contestantId: e.contestant_id,
-    round: i + 1,
+    points: e.points,
   }))
 
   const { data: allDraftPicks } = await supabase
@@ -168,9 +175,10 @@ export default async function LeaguePage({ params }: { params: Promise<{ leagueI
     .eq('league_id', leagueId)
 
   const standingsSource = (members ?? []).map((m) => {
-    const picks = (allDraftPicks ?? []).filter((p) => p.user_id === m.user_id)
-    const total = picks.reduce((sum, p) => sum + scoreDraftPick({ contestantId: p.contestant_id }, eliminations), 0)
-    return { user_id: m.user_id, points_awarded: total }
+    const picks = (allDraftPicks ?? [])
+      .filter((p) => p.user_id === m.user_id)
+      .map((p) => ({ contestantId: p.contestant_id }))
+    return { user_id: m.user_id, points_awarded: scoreWeeklyLineup(picks, seasonEventPoints) }
   })
 
   const myPickIds = new Set((myDraft ?? []).map((p) => p.contestant_id))
@@ -190,14 +198,14 @@ export default async function LeaguePage({ params }: { params: Promise<{ leagueI
               {contestants
                 ?.filter((c) => myPickIds.has(c.id))
                 .map((c) => {
-                  const elim = eliminations.find((e) => e.contestantId === c.id)
-                  const points = scoreDraftPick({ contestantId: c.id }, eliminations)
+                  const isOut = eliminatedContestantIds.has(c.id)
+                  const points = scoreWeeklyLineup([{ contestantId: c.id }], seasonEventPoints)
                   return (
                     <div key={c.id} className="flex flex-col items-center gap-1 text-sm">
                       <ContestantPhoto url={c.photo_url} name={c.name} />
                       <span>{c.name}</span>
-                      <span className={elim ? 'text-red-600' : 'text-emerald-600'}>
-                        {elim ? `Out — round ${elim.round}` : 'Still in'}
+                      <span className={isOut ? 'text-red-600' : 'text-emerald-600'}>
+                        {isOut ? 'Eliminated' : 'Still in'}
                       </span>
                       <span className="font-semibold">{points} pts</span>
                     </div>

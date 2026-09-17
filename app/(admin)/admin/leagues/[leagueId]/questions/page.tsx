@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { logContestantEvent, deleteContestantEvent } from './actions'
 import { DeleteButton } from '@/components/delete-button'
-import { TRAITORS_RULES } from '@/lib/scoring/traitors-rules'
+import { rulesetForShowName } from '@/lib/scoring/rulesets'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,9 +18,12 @@ export default async function LeagueEventsPage({
 
   const { data: league } = await supabase
     .from('leagues')
-    .select('name, season_id, join_code')
+    .select('name, season_id, join_code, seasons(shows(name))')
     .eq('id', leagueId)
     .single()
+
+  const showName = (league?.seasons as unknown as { shows: { name: string } } | null)?.shows?.name
+  const rules = rulesetForShowName(showName)
 
   const { data: episodes } = await supabase
     .from('episodes')
@@ -87,7 +90,7 @@ export default async function LeagueEventsPage({
               ))}
             </select>
             <select name="eventCode" required className="flex-1 rounded border p-2">
-              {TRAITORS_RULES.map((rule) => (
+              {rules.map((rule) => (
                 <option key={rule.code} value={rule.code}>
                   [{rule.category}] {rule.label} ({rule.points > 0 ? '+' : ''}
                   {rule.points})

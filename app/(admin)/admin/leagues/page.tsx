@@ -38,15 +38,19 @@ export default async function LeaguesPage() {
                 </div>
               </div>
               <span className="rounded bg-zinc-100 px-2 py-1 font-mono text-sm">{league.join_code}</span>
+              {league.format === 'bracket' && (
+                <a
+                  href={`/admin/leagues/${league.id}/bracket`}
+                  className="rounded bg-zinc-700 px-3 py-1 text-sm font-semibold text-white"
+                >
+                  Draft board
+                </a>
+              )}
               <a
-                href={
-                  league.format === 'bracket'
-                    ? `/admin/leagues/${league.id}/bracket`
-                    : `/admin/leagues/${league.id}/questions`
-                }
+                href={`/admin/leagues/${league.id}/questions`}
                 className="rounded bg-fuchsia-600 px-3 py-1 text-sm font-semibold text-white"
               >
-                Manage
+                Log events
               </a>
             </li>
           )

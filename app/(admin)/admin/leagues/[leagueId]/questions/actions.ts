@@ -1,7 +1,7 @@
 'use server'
 
 import { requireAdmin } from '@/lib/auth/require-admin'
-import { findRule } from '@/lib/scoring/traitors-rules'
+import { findRuleAcrossSets } from '@/lib/scoring/rulesets'
 import { revalidatePath } from 'next/cache'
 
 export async function logContestantEvent(leagueId: string, episodeId: string, formData: FormData) {
@@ -9,7 +9,7 @@ export async function logContestantEvent(leagueId: string, episodeId: string, fo
   const contestantId = String(formData.get('contestantId'))
   const eventCode = String(formData.get('eventCode'))
 
-  const rule = findRule(eventCode)
+  const rule = findRuleAcrossSets(eventCode)
   if (!rule) return
 
   await supabase.from('contestant_episode_events').insert({
