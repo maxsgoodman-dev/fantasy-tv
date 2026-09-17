@@ -3,10 +3,11 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 
-export async function submitPick(leagueId: string, questionId: string, formData: FormData) {
+export async function submitPick(leagueId: string, questionId: string, contestantId: string) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  const contestantId = String(formData.get('contestantId'))
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
   await supabase
     .from('member_picks')
@@ -18,10 +19,11 @@ export async function submitPick(leagueId: string, questionId: string, formData:
   revalidatePath(`/leagues/${leagueId}`)
 }
 
-export async function submitBracketPick(leagueId: string, matchupId: string, formData: FormData) {
+export async function submitBracketPick(leagueId: string, matchupId: string, predictedWinnerId: string) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  const predictedWinnerId = String(formData.get('predictedWinnerId'))
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
   await supabase
     .from('member_bracket_picks')
