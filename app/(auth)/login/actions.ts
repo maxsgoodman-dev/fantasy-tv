@@ -3,7 +3,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 
-export async function login(formData: FormData) {
+export type LoginState = { error?: string }
+
+export async function login(_prevState: LoginState, formData: FormData): Promise<LoginState> {
   const email = String(formData.get('email'))
   const password = String(formData.get('password'))
 

@@ -12,7 +12,9 @@ const SignupSchema = z.object({
   displayName: z.string().min(1).max(50),
 })
 
-export async function signup(formData: FormData) {
+export type SignupState = { error?: string }
+
+export async function signup(_prevState: SignupState, formData: FormData): Promise<SignupState> {
   const parsed = SignupSchema.safeParse({
     email: formData.get('email'),
     password: formData.get('password'),

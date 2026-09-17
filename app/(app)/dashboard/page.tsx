@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { joinLeague } from './actions'
+import { JoinLeagueForm } from './join-league-form'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,13 +14,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <form action={async (formData: FormData) => {
-        'use server'
-        await joinLeague(formData)
-      }} className="flex gap-2">
-        <input name="code" placeholder="Join code" required className="rounded border p-2 uppercase" />
-        <button type="submit" className="rounded bg-fuchsia-600 px-4 text-white">Join</button>
-      </form>
+      <JoinLeagueForm />
 
       <ul className="flex flex-col gap-2">
         {memberships?.map((m) => {
