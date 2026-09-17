@@ -37,9 +37,17 @@ export default async function LeaguePage({ params }: { params: Promise<{ leagueI
 
   const { data: league } = await supabase
     .from('leagues')
-    .select('name, format, season_id')
+    .select('name, format, season_id, seasons(shows(id))')
     .eq('id', leagueId)
     .single()
+
+  const showId = (league?.seasons as unknown as { shows: { id: string } } | null)?.shows?.id
+  const { count: historySeasonCount } = showId
+    ? await supabase
+        .from('show_history_seasons')
+        .select('id', { count: 'exact', head: true })
+        .eq('show_id', showId)
+    : { count: 0 }
 
   const { data: members } = await supabase
     .from('league_members')
@@ -95,7 +103,17 @@ export default async function LeaguePage({ params }: { params: Promise<{ leagueI
 
     return (
       <div className="flex flex-col gap-8">
-        <h1 className="text-2xl font-bold">{league?.name}</h1>
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold">{league?.name}</h1>
+          {(historySeasonCount ?? 0) > 0 && (
+            <a
+              href={`/leagues/${leagueId}/history`}
+              className="rounded bg-zinc-700 px-3 py-1.5 text-sm font-semibold text-white"
+            >
+              League History
+            </a>
+          )}
+        </div>
 
         <section className="flex flex-col gap-4">
           <h2 className="text-xl font-bold">Set your weekly team</h2>
@@ -185,7 +203,17 @@ export default async function LeaguePage({ params }: { params: Promise<{ leagueI
 
   return (
     <div className="flex flex-col gap-8">
-      <h1 className="text-2xl font-bold">{league?.name}</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">{league?.name}</h1>
+        {(historySeasonCount ?? 0) > 0 && (
+          <a
+            href={`/leagues/${leagueId}/history`}
+            className="rounded bg-zinc-700 px-3 py-1.5 text-sm font-semibold text-white"
+          >
+            League History
+          </a>
+        )}
+      </div>
 
       <section className="flex flex-col gap-4">
         <h2 className="text-xl font-bold">Your season draft</h2>
