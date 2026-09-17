@@ -3,7 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
-import { resend } from '@/lib/email/resend'
+import { resend, EMAIL_FROM } from '@/lib/email/resend'
 import { welcomeEmail } from '@/lib/email/templates'
 
 const SignupSchema = z.object({
@@ -45,7 +45,7 @@ export async function signup(_prevState: SignupState, formData: FormData): Promi
   try {
     const { subject, text } = welcomeEmail(parsed.data.displayName)
     await resend.emails.send({
-      from: 'Fantasy TV <notify@fantasytv.app>',
+      from: EMAIL_FROM,
       to: parsed.data.email,
       subject,
       text,

@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import { resend } from '@/lib/email/resend'
+import { resend, EMAIL_FROM } from '@/lib/email/resend'
 import { lockReminderEmail } from '@/lib/email/templates'
 import { NextResponse } from 'next/server'
 
@@ -54,7 +54,7 @@ export async function GET(request: Request) {
             ? `Your season draft locks before Episode ${ep.episode_number} airs`
             : `Set your team for Episode ${ep.episode_number}`
         const { subject, text } = lockReminderEmail(league.name, message)
-        await resend.emails.send({ from: 'Fantasy TV <notify@fantasytv.app>', to: authUser.email, subject, text })
+        await resend.emails.send({ from: EMAIL_FROM, to: authUser.email, subject, text })
         sent++
       }
     }

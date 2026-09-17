@@ -2,7 +2,7 @@
 
 import { requireAdmin } from '@/lib/auth/require-admin'
 import { revalidatePath } from 'next/cache'
-import { resend } from '@/lib/email/resend'
+import { resend, EMAIL_FROM } from '@/lib/email/resend'
 import { resultsPostedEmail } from '@/lib/email/templates'
 
 export async function addEpisodeEvent(episodeId: string, formData: FormData) {
@@ -54,7 +54,7 @@ async function sendResultsPostedEmails(episodeId: string) {
       const authUser = userEmails.users.find((u) => u.id === member.user_id)
       if (!authUser?.email) continue
       const { subject, text } = resultsPostedEmail(league.name, episode.episode_number)
-      await resend.emails.send({ from: 'Fantasy TV <notify@fantasytv.app>', to: authUser.email, subject, text })
+      await resend.emails.send({ from: EMAIL_FROM, to: authUser.email, subject, text })
     }
   }
 }
