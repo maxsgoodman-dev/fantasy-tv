@@ -37,7 +37,13 @@ export default async function EpisodeResultsPage({ params }: { params: Promise<{
       </ul>
 
       <form action={addEpisodeEvent.bind(null, episodeId)} className="flex gap-2">
-        <input name="eventType" placeholder="Event type (e.g. eliminated)" required className="rounded border p-2" />
+        <input
+          name="eventType"
+          defaultValue="eliminated"
+          placeholder="Event type (use exactly &quot;eliminated&quot; for elimination results)"
+          required
+          className="rounded border p-2"
+        />
         <select name="contestantId" required className="rounded border p-2">
           {contestants?.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>

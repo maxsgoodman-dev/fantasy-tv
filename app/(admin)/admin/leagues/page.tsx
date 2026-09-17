@@ -34,7 +34,7 @@ export default async function LeaguesPage() {
                 <div className="font-bold">{league.name}</div>
                 <div className="text-sm text-zinc-600">
                   {season?.shows?.name} — {season?.name} ·{' '}
-                  {league.format === 'bracket' ? 'Bracket' : 'Weekly vote'}
+                  {league.format === 'bracket' ? 'Season draft' : 'Weekly team'}
                 </div>
               </div>
               <span className="rounded bg-zinc-100 px-2 py-1 font-mono text-sm">{league.join_code}</span>

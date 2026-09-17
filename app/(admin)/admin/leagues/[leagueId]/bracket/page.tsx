@@ -1,9 +1,13 @@
 import { createClient } from '@/lib/supabase/server'
-import { seedRoundOne, setMatchupWinner } from './actions'
+import { scoreDraftPick, type Elimination } from '@/lib/scoring/survival-draft'
 
 export const dynamic = 'force-dynamic'
 
-export default async function BracketAdminPage({ params }: { params: Promise<{ leagueId: string }> }) {
+export default async function LeagueDraftOverviewPage({
+  params,
+}: {
+  params: Promise<{ leagueId: string }>
+}) {
   const { leagueId } = await params
   const supabase = await createClient()
 
@@ -13,18 +17,39 @@ export default async function BracketAdminPage({ params }: { params: Promise<{ l
     .eq('id', leagueId)
     .single()
 
-  const { data: matchups } = await supabase
-    .from('bracket_matchups')
-    .select('id, round, matchup_index, winner_id, contestant_a:contestants!contestant_a_id(id, name), contestant_b:contestants!contestant_b_id(id, name)')
-    .eq('league_id', leagueId)
-    .order('round')
-    .order('matchup_index')
-
-  const { data: contestants } = await supabase
-    .from('contestants')
-    .select('id, name')
+  const { data: episodes } = await supabase
+    .from('episodes')
+    .select('id, episode_number, air_date')
     .eq('season_id', league!.season_id)
-    .order('name')
+    .order('episode_number')
+
+  const draftLockEpisode = episodes?.find((e) => e.episode_number === 2)
+  const draftLocked = draftLockEpisode ? draftLockEpisode.air_date <= new Date().toISOString() : false
+
+  const { data: eliminationEvents } = await supabase
+    .from('episode_events')
+    .select('contestant_id, episodes!inner(episode_number, season_id)')
+    .eq('event_type', 'eliminated')
+    .eq('episodes.season_id', league!.season_id)
+    .order('episodes(episode_number)', { ascending: true })
+
+  const eliminations: Elimination[] = (eliminationEvents ?? []).map((e, i) => ({
+    contestantId: e.contestant_id,
+    round: i + 1,
+  }))
+
+  const { data: draftPicks } = await supabase
+    .from('draft_picks')
+    .select('user_id, contestant_id, profiles(display_name), contestants(name)')
+    .eq('league_id', leagueId)
+
+  const byMember = new Map<string, { name: string; picks: { name: string; contestantId: string }[] }>()
+  for (const p of draftPicks ?? []) {
+    const memberName = (p.profiles as unknown as { display_name: string } | null)?.display_name ?? 'Member'
+    const contestantName = (p.contestants as unknown as { name: string } | null)?.name ?? 'Unknown'
+    if (!byMember.has(p.user_id)) byMember.set(p.user_id, { name: memberName, picks: [] })
+    byMember.get(p.user_id)!.picks.push({ name: contestantName, contestantId: p.contestant_id })
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -32,39 +57,36 @@ export default async function BracketAdminPage({ params }: { params: Promise<{ l
         ← Leagues
       </a>
       <h1 className="text-2xl font-bold">{league?.name}</h1>
-      <p>Join code: <span className="font-mono">{league?.join_code}</span></p>
+      <p>
+        Join code: <span className="font-mono">{league?.join_code}</span>
+      </p>
+      <p className="text-sm text-zinc-600">
+        This is a season-long draft league — members pick their team themselves (locks when Episode 2
+        airs{draftLockEpisode ? `, ${new Date(draftLockEpisode.air_date).toLocaleString()}` : ''}). There&apos;s
+        no admin setup here: eliminations come from the normal episode results flow, and scores update
+        automatically. Draft status: <strong>{draftLocked ? 'Locked' : 'Open'}</strong>.
+      </p>
 
-      {(!matchups || matchups.length === 0) && (
-        <form action={seedRoundOne.bind(null, leagueId)} className="flex flex-col gap-2">
-          <p>Select contestants in matchup order (pairs of two):</p>
-          {contestants?.map((c) => (
-            <label key={c.id} className="flex items-center gap-2">
-              <input type="checkbox" name="contestantId" value={c.id} /> {c.name}
-            </label>
-          ))}
-          <button type="submit" className="w-fit rounded bg-fuchsia-600 px-4 py-2 text-white">Seed round 1</button>
-        </form>
-      )}
-
-      {matchups?.map((m) => {
-        const a = m.contestant_a as unknown as { id: string; name: string } | null
-        const b = m.contestant_b as unknown as { id: string; name: string } | null
-        return (
-          <div key={m.id} className="flex items-center gap-4 border p-2">
-            <span>Round {m.round}, Match {m.matchup_index + 1}: {a?.name ?? 'TBD'} vs {b?.name ?? 'TBD'}</span>
-            {!m.winner_id && a && b && (
-              <form action={setMatchupWinner.bind(null, leagueId, m.id)} className="flex gap-2">
-                <select name="winnerId" required className="rounded border p-1">
-                  <option value={a.id}>{a.name}</option>
-                  <option value={b.id}>{b.name}</option>
-                </select>
-                <button type="submit" className="rounded bg-fuchsia-600 px-2 text-white">Post winner</button>
-              </form>
-            )}
-            {m.winner_id && <span className="font-bold">Winner set</span>}
+      <div className="card flex flex-col gap-4 p-4">
+        <h2 className="text-xl font-bold">Draft board</h2>
+        {byMember.size === 0 && <p className="text-zinc-600">No one has drafted a team yet.</p>}
+        {Array.from(byMember.entries()).map(([userId, m]) => (
+          <div key={userId}>
+            <p className="font-semibold">{m.name}</p>
+            <ul className="list-disc pl-6 text-sm">
+              {m.picks.map((pick) => {
+                const elim = eliminations.find((e) => e.contestantId === pick.contestantId)
+                const points = scoreDraftPick({ contestantId: pick.contestantId }, eliminations)
+                return (
+                  <li key={pick.contestantId}>
+                    {pick.name} — {elim ? `out, round ${elim.round}` : 'still in'} ({points} pts)
+                  </li>
+                )
+              })}
+            </ul>
           </div>
-        )
-      })}
+        ))}
+      </div>
     </div>
   )
 }

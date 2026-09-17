@@ -1,19 +1,17 @@
 import { createClient } from '@/lib/supabase/server'
-import { submitPick, submitBracketPick } from './actions'
+import { saveLineup, saveDraft } from './actions'
 import { Avatar } from '@/components/avatar'
+import { scoreWeeklyLineup } from '@/lib/scoring/weekly-team'
+import { scoreDraftPick, type Elimination } from '@/lib/scoring/survival-draft'
 
 export const dynamic = 'force-dynamic'
+
+type ContestantLite = { id: string; name: string; photo_url: string | null }
 
 function ContestantPhoto({ url, name }: { url: string | null; name: string }) {
   if (url) {
     // eslint-disable-next-line @next/next/no-img-element
-    return (
-      <img
-        src={url}
-        alt={name}
-        className="h-24 w-24 rounded-lg object-cover sm:h-32 sm:w-32"
-      />
-    )
+    return <img src={url} alt={name} className="h-24 w-24 rounded-lg object-cover sm:h-32 sm:w-32" />
   }
   return (
     <div className="flex h-24 w-24 items-center justify-center rounded-lg bg-zinc-200 text-center text-xs text-zinc-500 sm:h-32 sm:w-32">
@@ -22,32 +20,29 @@ function ContestantPhoto({ url, name }: { url: string | null; name: string }) {
   )
 }
 
-function ContestantPickButton({
-  action,
+function ContestantCheckbox({
   contestant,
-  selected,
-  disabled,
-  isWinner,
+  checked,
 }: {
-  action: (formData: FormData) => void | Promise<void>
-  contestant: { id: string; name: string; photo_url: string | null }
-  selected: boolean
-  disabled?: boolean
-  isWinner?: boolean
+  contestant: ContestantLite
+  checked: boolean
 }) {
   return (
-    <form action={action}>
-      <button
-        type="submit"
-        disabled={disabled}
-        className={`flex flex-col items-center gap-1 rounded-lg border-2 p-2 text-sm sm:text-base ${
-          selected ? 'border-fuchsia-600 bg-fuchsia-50' : 'border-transparent'
-        } ${isWinner ? 'ring-2 ring-emerald-500' : ''}`}
-      >
-        <ContestantPhoto url={contestant.photo_url} name={contestant.name} />
-        <span>{contestant.name}</span>
-      </button>
-    </form>
+    <label
+      className={`flex cursor-pointer flex-col items-center gap-1 rounded-lg border-2 p-2 text-sm sm:text-base ${
+        checked ? 'border-fuchsia-600 bg-fuchsia-50' : 'border-transparent'
+      }`}
+    >
+      <input
+        type="checkbox"
+        name="contestantId"
+        value={contestant.id}
+        defaultChecked={checked}
+        className="sr-only"
+      />
+      <ContestantPhoto url={contestant.photo_url} name={contestant.name} />
+      <span>{contestant.name}</span>
+    </label>
   )
 }
 
@@ -85,94 +80,85 @@ export default async function LeaguePage({ params }: { params: Promise<{ leagueI
     .eq('season_id', league!.season_id)
     .order('episode_number')
 
-  let standingsSource: { user_id: string; points_awarded: number }[] = []
+  const { data: contestants } = await supabase
+    .from('contestants')
+    .select('id, name, photo_url')
+    .eq('season_id', league!.season_id)
+    .order('name')
 
   if (league?.format === 'weekly_vote') {
-    const { data: openQuestions } = await supabase
-      .from('weekly_questions')
-      .select('id, question_text, lock_at, episodes(episode_number)')
+    const now = new Date().toISOString()
+    const upcomingEpisodes = (episodes ?? []).filter((e) => e.air_date > now)
+
+    const { data: myLineups } = await supabase
+      .from('weekly_lineups')
+      .select('id, episode_id, weekly_lineup_picks(contestant_id)')
       .eq('league_id', leagueId)
-      .is('resolved_at', null)
-      .gt('lock_at', new Date().toISOString())
-
-    const { data: contestants } = await supabase
-      .from('contestants')
-      .select('id, name, photo_url')
-      .eq('season_id', league!.season_id)
-      .order('name')
-
-    const { data: myPicks } = await supabase
-      .from('member_picks')
-      .select('weekly_question_id, picked_contestant_id')
       .eq('user_id', user!.id)
 
-    const { data: allPicks } = await supabase
-      .from('member_picks')
-      .select('user_id, points_awarded, weekly_questions!inner(league_id)')
-      .eq('weekly_questions.league_id', leagueId)
+    // Everything needed to compute every member's total score.
+    const { data: allLineups } = await supabase
+      .from('weekly_lineups')
+      .select('user_id, episode_id, weekly_lineup_picks(contestant_id)')
+      .eq('league_id', leagueId)
 
-    standingsSource = allPicks ?? []
+    const { data: allEvents } = await supabase
+      .from('contestant_episode_events')
+      .select('contestant_id, points, episode_id, episodes!inner(season_id)')
+      .eq('episodes.season_id', league.season_id)
+
+    const standingsSource = (members ?? []).map((m) => {
+      const memberLineups = (allLineups ?? []).filter((l) => l.user_id === m.user_id)
+      const total = memberLineups.reduce((sum, lineup) => {
+        const picks = (lineup.weekly_lineup_picks as unknown as { contestant_id: string }[]).map((p) => ({
+          contestantId: p.contestant_id,
+        }))
+        const eventsForEpisode = (allEvents ?? [])
+          .filter((e) => e.episode_id === lineup.episode_id)
+          .map((e) => ({ contestantId: e.contestant_id, points: e.points }))
+        return sum + scoreWeeklyLineup(picks, eventsForEpisode)
+      }, 0)
+      return { user_id: m.user_id, points_awarded: total }
+    })
 
     return (
       <div className="flex flex-col gap-8">
         <h1 className="text-2xl font-bold">{league?.name}</h1>
 
         <section className="flex flex-col gap-4">
-          <h2 className="text-xl font-bold">This week&apos;s picks</h2>
-          {openQuestions?.length === 0 && (
-            <p className="text-zinc-600">No open questions right now — check back once the admin adds one.</p>
+          <h2 className="text-xl font-bold">Set your weekly team</h2>
+          <p className="text-sm text-zinc-600">
+            Pick your team for each upcoming episode. Picks lock when that episode airs — you can change
+            your team any time before then, and it can be different every week.
+          </p>
+          {upcomingEpisodes.length === 0 && (
+            <p className="text-zinc-600">No upcoming episodes open for picks right now.</p>
           )}
-          {openQuestions?.map((q) => {
-            const episode = q.episodes as unknown as { episode_number: number } | null
-            const myPickId = myPicks?.find((p) => p.weekly_question_id === q.id)?.picked_contestant_id
-            const myPickContestant = contestants?.find((c) => c.id === myPickId)
-            const grid = (
-              <div className="flex flex-wrap gap-3">
-                {contestants?.map((c) => (
-                  <ContestantPickButton
-                    key={c.id}
-                    action={submitPick.bind(null, leagueId, q.id, c.id)}
-                    contestant={c}
-                    selected={myPickId === c.id}
-                  />
-                ))}
-              </div>
+          {upcomingEpisodes.map((ep) => {
+            const myLineup = myLineups?.find((l) => l.episode_id === ep.id)
+            const myPickIds = new Set(
+              ((myLineup?.weekly_lineup_picks as unknown as { contestant_id: string }[]) ?? []).map(
+                (p) => p.contestant_id
+              )
             )
             return (
-              <div key={q.id} className="card flex flex-col gap-3 p-4">
+              <form key={ep.id} action={saveLineup.bind(null, leagueId, ep.id)} className="card flex flex-col gap-3 p-4">
                 <div>
-                  <p className="font-semibold">
-                    {episode ? `Episode ${episode.episode_number}: ` : ''}
-                    {q.question_text}
-                  </p>
-                  <p className="text-xs text-zinc-500">Locks {formatAirDate(q.lock_at)}</p>
+                  <p className="font-semibold">Episode {ep.episode_number}</p>
+                  <p className="text-xs text-zinc-500">Locks {formatAirDate(ep.air_date)}</p>
                 </div>
-
-                {myPickContestant ? (
-                  <details className="group">
-                    <summary className="flex cursor-pointer list-none items-center gap-3">
-                      <span className="text-sm text-zinc-600">Your pick:</span>
-                      <span className="flex items-center gap-2 rounded-lg border-2 border-fuchsia-600 bg-fuchsia-50 p-1 pr-3">
-                        <img
-                          src={myPickContestant.photo_url ?? undefined}
-                          alt={myPickContestant.name}
-                          className="h-10 w-10 rounded object-cover"
-                        />
-                        <span className="text-sm font-semibold">{myPickContestant.name}</span>
-                      </span>
-                      <span className="text-sm font-semibold text-fuchsia-700 underline group-open:hidden">
-                        Edit pick
-                      </span>
-                      <span className="hidden text-sm font-semibold text-fuchsia-700 underline group-open:inline">
-                        Hide
-                      </span>
-                    </summary>
-                    <div className="mt-3">{grid}</div>
-                  </details>
-                ) : (
-                  grid
-                )}
-              </div>
+                <div className="flex flex-wrap gap-3">
+                  {contestants?.map((c) => (
+                    <ContestantCheckbox key={c.id} contestant={c} checked={myPickIds.has(c.id)} />
+                  ))}
+                </div>
+                <button
+                  type="submit"
+                  className="w-fit rounded bg-fuchsia-600 px-4 py-2 text-sm font-semibold text-white"
+                >
+                  Save team
+                </button>
+              </form>
             )
           })}
         </section>
@@ -183,97 +169,91 @@ export default async function LeaguePage({ params }: { params: Promise<{ leagueI
     )
   }
 
-  // Bracket format
-  const { data: matchups } = await supabase
-    .from('bracket_matchups')
-    .select(
-      'id, round, matchup_index, winner_id, contestant_a:contestants!contestant_a_id(id, name, photo_url), contestant_b:contestants!contestant_b_id(id, name, photo_url)'
-    )
-    .eq('league_id', leagueId)
-    .order('round')
-    .order('matchup_index')
+  // Survival draft format ("bracket")
+  const draftLockEpisode = episodes?.find((e) => e.episode_number === 2)
+  const draftLocked = draftLockEpisode ? draftLockEpisode.air_date <= new Date().toISOString() : false
 
-  const { data: myBracketPicks } = await supabase
-    .from('member_bracket_picks')
-    .select('matchup_id, predicted_winner_id')
+  const { data: myDraft } = await supabase
+    .from('draft_picks')
+    .select('contestant_id')
+    .eq('league_id', leagueId)
     .eq('user_id', user!.id)
 
-  const { data: allBracketPicks } = await supabase
-    .from('member_bracket_picks')
-    .select('user_id, points_awarded, bracket_matchups!inner(league_id)')
-    .eq('bracket_matchups.league_id', leagueId)
+  const { data: eliminationEvents } = await supabase
+    .from('episode_events')
+    .select('contestant_id, episodes!inner(episode_number, season_id)')
+    .eq('event_type', 'eliminated')
+    .eq('episodes.season_id', league!.season_id)
+    .order('episodes(episode_number)', { ascending: true })
 
-  standingsSource = allBracketPicks ?? []
+  const eliminations: Elimination[] = (eliminationEvents ?? []).map((e, i) => ({
+    contestantId: e.contestant_id,
+    round: i + 1,
+  }))
+
+  const { data: allDraftPicks } = await supabase
+    .from('draft_picks')
+    .select('user_id, contestant_id')
+    .eq('league_id', leagueId)
+
+  const standingsSource = (members ?? []).map((m) => {
+    const picks = (allDraftPicks ?? []).filter((p) => p.user_id === m.user_id)
+    const total = picks.reduce((sum, p) => sum + scoreDraftPick({ contestantId: p.contestant_id }, eliminations), 0)
+    return { user_id: m.user_id, points_awarded: total }
+  })
+
+  const myPickIds = new Set((myDraft ?? []).map((p) => p.contestant_id))
 
   return (
     <div className="flex flex-col gap-8">
       <h1 className="text-2xl font-bold">{league?.name}</h1>
 
       <section className="flex flex-col gap-4">
-        <h2 className="text-xl font-bold">Bracket</h2>
-        {matchups?.length === 0 && (
-          <p className="text-zinc-600">The bracket hasn&apos;t been seeded yet — check back once the admin sets it up.</p>
+        <h2 className="text-xl font-bold">Your season draft</h2>
+        {draftLocked ? (
+          <div className="card flex flex-col gap-3 p-4">
+            <p className="text-sm text-zinc-600">
+              The draft is locked. Here&apos;s how your picks are doing:
+            </p>
+            <div className="flex flex-wrap gap-3">
+              {contestants
+                ?.filter((c) => myPickIds.has(c.id))
+                .map((c) => {
+                  const elim = eliminations.find((e) => e.contestantId === c.id)
+                  const points = scoreDraftPick({ contestantId: c.id }, eliminations)
+                  return (
+                    <div key={c.id} className="flex flex-col items-center gap-1 text-sm">
+                      <ContestantPhoto url={c.photo_url} name={c.name} />
+                      <span>{c.name}</span>
+                      <span className={elim ? 'text-red-600' : 'text-emerald-600'}>
+                        {elim ? `Out — round ${elim.round}` : 'Still in'}
+                      </span>
+                      <span className="font-semibold">{points} pts</span>
+                    </div>
+                  )
+                })}
+            </div>
+          </div>
+        ) : (
+          <form action={saveDraft.bind(null, leagueId)} className="card flex flex-col gap-3 p-4">
+            <p className="text-sm text-zinc-600">
+              Pick your team for the season. Locks when Episode 2 airs
+              {draftLockEpisode ? ` (${formatAirDate(draftLockEpisode.air_date)})` : ''}. You can change your
+              picks any time before then.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              {contestants?.map((c) => (
+                <ContestantCheckbox key={c.id} contestant={c} checked={myPickIds.has(c.id)} />
+              ))}
+            </div>
+            <button
+              type="submit"
+              className="w-fit rounded bg-fuchsia-600 px-4 py-2 text-sm font-semibold text-white"
+            >
+              Save draft
+            </button>
+          </form>
         )}
-        {matchups?.map((m) => {
-          const a = m.contestant_a as unknown as { id: string; name: string; photo_url: string | null } | null
-          const b = m.contestant_b as unknown as { id: string; name: string; photo_url: string | null } | null
-          const myPickId = myBracketPicks?.find((p) => p.matchup_id === m.id)?.predicted_winner_id
-          const myPickContestant = [a, b].find((c) => c?.id === myPickId)
-          const cards = (
-            <div className="flex items-center gap-4">
-              {[a, b].map((c, i) =>
-                c ? (
-                  <ContestantPickButton
-                    key={c.id}
-                    action={submitBracketPick.bind(null, leagueId, m.id, c.id)}
-                    contestant={c}
-                    selected={myPickId === c.id}
-                    disabled={!!m.winner_id}
-                    isWinner={m.winner_id === c.id}
-                  />
-                ) : (
-                  <div key={`tbd-${i}`} className="text-sm text-zinc-400">
-                    TBD
-                  </div>
-                )
-              )}
-            </div>
-          )
-          return (
-            <div key={m.id} className="card flex flex-col gap-2 p-4">
-              <p className="text-xs font-semibold text-zinc-500">
-                Round {m.round}, Match {m.matchup_index + 1}
-              </p>
-
-              {myPickContestant && !m.winner_id ? (
-                <details className="group">
-                  <summary className="flex cursor-pointer list-none items-center gap-3">
-                    <span className="text-sm text-zinc-600">Your pick:</span>
-                    <span className="flex items-center gap-2 rounded-lg border-2 border-fuchsia-600 bg-fuchsia-50 p-1 pr-3">
-                      <img
-                        src={myPickContestant.photo_url ?? undefined}
-                        alt={myPickContestant.name}
-                        className="h-10 w-10 rounded object-cover"
-                      />
-                      <span className="text-sm font-semibold">{myPickContestant.name}</span>
-                    </span>
-                    <span className="text-sm font-semibold text-fuchsia-700 underline group-open:hidden">
-                      Edit pick
-                    </span>
-                    <span className="hidden text-sm font-semibold text-fuchsia-700 underline group-open:inline">
-                      Hide
-                    </span>
-                  </summary>
-                  <div className="mt-3">{cards}</div>
-                </details>
-              ) : (
-                cards
-              )}
-
-              {m.winner_id && <p className="text-xs font-semibold text-emerald-600">Winner decided</p>}
-            </div>
-          )
-        })}
       </section>
 
       <EpisodesSection episodes={episodes} />

@@ -1,10 +1,19 @@
 import { createClient } from '@/lib/supabase/server'
-import { createWeeklyQuestion } from './actions'
+import { logContestantEvent, deleteContestantEvent } from './actions'
+import { DeleteButton } from '@/components/delete-button'
+import { TRAITORS_RULES } from '@/lib/scoring/traitors-rules'
 
 export const dynamic = 'force-dynamic'
 
-export default async function LeagueQuestionsPage({ params }: { params: Promise<{ leagueId: string }> }) {
+export default async function LeagueEventsPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ leagueId: string }>
+  searchParams: Promise<{ episodeId?: string }>
+}) {
   const { leagueId } = await params
+  const { episodeId: episodeIdParam } = await searchParams
   const supabase = await createClient()
 
   const { data: league } = await supabase
@@ -12,16 +21,29 @@ export default async function LeagueQuestionsPage({ params }: { params: Promise<
     .select('name, season_id, join_code')
     .eq('id', leagueId)
     .single()
+
   const { data: episodes } = await supabase
     .from('episodes')
-    .select('id, episode_number')
+    .select('id, episode_number, air_date')
     .eq('season_id', league!.season_id)
     .order('episode_number')
 
-  const { data: questions } = await supabase
-    .from('weekly_questions')
-    .select('id, question_text, event_type_target, lock_at, resolved_at')
-    .eq('league_id', leagueId)
+  const episodeId = episodeIdParam ?? episodes?.[0]?.id
+  const currentEpisode = episodes?.find((e) => e.id === episodeId)
+
+  const { data: contestants } = await supabase
+    .from('contestants')
+    .select('id, name')
+    .eq('season_id', league!.season_id)
+    .order('name')
+
+  const { data: loggedEvents } = episodeId
+    ? await supabase
+        .from('contestant_episode_events')
+        .select('id, event_code, label, points, contestants(name)')
+        .eq('episode_id', episodeId)
+        .order('created_at', { ascending: false })
+    : { data: [] as never[] }
 
   return (
     <div className="flex flex-col gap-6">
@@ -32,24 +54,78 @@ export default async function LeagueQuestionsPage({ params }: { params: Promise<
       <p>
         Join code: <span className="font-mono">{league?.join_code}</span>
       </p>
-      <ul className="list-disc pl-6">
-        {questions?.map((q) => (
-          <li key={q.id}>
-            {q.question_text} (target: {q.event_type_target}) — locks {new Date(q.lock_at).toLocaleString()}
-            {q.resolved_at ? ' — resolved' : ''}
-          </li>
-        ))}
-      </ul>
 
-      <form action={createWeeklyQuestion.bind(null, leagueId)} className="flex flex-col gap-2 max-w-md">
-        <select name="episodeId" required className="rounded border p-2">
-          {episodes?.map((e) => <option key={e.id} value={e.id}>Episode {e.episode_number}</option>)}
-        </select>
-        <input name="questionText" placeholder="Question (e.g. Who gets eliminated?)" required className="rounded border p-2" />
-        <input name="eventTypeTarget" placeholder="Event type target (e.g. eliminated)" required className="rounded border p-2" />
-        <input name="lockAt" type="datetime-local" required className="rounded border p-2" />
-        <button type="submit" className="rounded bg-fuchsia-600 p-2 text-white">Add question</button>
-      </form>
+      <div className="flex flex-wrap gap-2">
+        {episodes?.map((e) => (
+          <a
+            key={e.id}
+            href={`/admin/leagues/${leagueId}/questions?episodeId=${e.id}`}
+            className={`rounded-full px-3 py-1 text-sm font-semibold ${
+              e.id === episodeId ? 'bg-fuchsia-600 text-white' : 'bg-zinc-100 text-zinc-700'
+            }`}
+          >
+            Ep. {e.episode_number}
+          </a>
+        ))}
+      </div>
+
+      {currentEpisode && (
+        <div className="card flex flex-col gap-4 p-4">
+          <h2 className="text-xl font-bold">
+            Log events — Episode {currentEpisode.episode_number}
+          </h2>
+
+          <form
+            action={logContestantEvent.bind(null, leagueId, currentEpisode.id)}
+            className="flex flex-wrap gap-2"
+          >
+            <select name="contestantId" required className="rounded border p-2">
+              {contestants?.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+            <select name="eventCode" required className="flex-1 rounded border p-2">
+              {TRAITORS_RULES.map((rule) => (
+                <option key={rule.code} value={rule.code}>
+                  [{rule.category}] {rule.label} ({rule.points > 0 ? '+' : ''}
+                  {rule.points})
+                </option>
+              ))}
+            </select>
+            <button type="submit" className="rounded bg-fuchsia-600 px-4 text-white">
+              Log event
+            </button>
+          </form>
+
+          <ul className="flex flex-col gap-1">
+            {loggedEvents?.map((ev) => {
+              const contestant = ev.contestants as unknown as { name: string } | null
+              return (
+                <li key={ev.id} className="flex items-center gap-2 text-sm">
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                      ev.points >= 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
+                    }`}
+                  >
+                    {ev.points > 0 ? '+' : ''}
+                    {ev.points}
+                  </span>
+                  <span className="font-semibold">{contestant?.name}</span>
+                  <span className="text-zinc-600">{ev.label}</span>
+                  <form action={deleteContestantEvent.bind(null, leagueId, ev.id)}>
+                    <DeleteButton confirmText="Remove this logged event?" label="×" />
+                  </form>
+                </li>
+              )
+            })}
+            {loggedEvents?.length === 0 && (
+              <li className="text-sm text-zinc-500">No events logged for this episode yet.</li>
+            )}
+          </ul>
+        </div>
+      )}
     </div>
   )
 }

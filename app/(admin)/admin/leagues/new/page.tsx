@@ -28,8 +28,8 @@ export default async function NewLeaguePage() {
       </select>
       <input name="name" placeholder="League name" required className="rounded border p-2" />
       <select name="format" required className="rounded border p-2">
-        <option value="weekly_vote">Weekly vote</option>
-        <option value="bracket">Bracket</option>
+        <option value="weekly_vote">Weekly team (pick a squad each episode, event-based scoring)</option>
+        <option value="bracket">Season draft (pick once, survival-based scoring)</option>
       </select>
       <button type="submit" className="rounded bg-fuchsia-600 p-2 font-semibold text-white">
         Create league

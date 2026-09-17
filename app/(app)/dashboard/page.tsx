@@ -83,7 +83,7 @@ export default async function DashboardPage() {
                     className="w-fit rounded-full px-2 py-0.5 text-xs font-semibold text-white"
                     style={{ backgroundColor: accent }}
                   >
-                    {league.format === 'bracket' ? 'Bracket' : 'Weekly vote'}
+                    {league.format === 'bracket' ? 'Season draft' : 'Weekly team'}
                   </span>
                 </div>
               </a>
