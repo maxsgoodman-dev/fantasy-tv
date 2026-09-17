@@ -6,22 +6,22 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   await requireAdmin()
   return (
     <div>
-      <nav className="flex flex-wrap items-center gap-4 border-b bg-zinc-50 p-4">
-        <span className="font-bold text-fuchsia-700">Admin</span>
-        <a href="/admin/shows" className="font-medium">
+      <nav className="flex flex-wrap items-center gap-4 border-b-2 border-fuchsia-200 bg-white p-4 shadow-sm">
+        <span className="rounded-full bg-fuchsia-700 px-3 py-1 text-sm font-bold text-white">Admin</span>
+        <a href="/admin/shows" className="font-medium text-zinc-700 hover:text-fuchsia-700">
           Shows &amp; Seasons
         </a>
-        <a href="/admin/leagues" className="font-medium">
+        <a href="/admin/leagues" className="font-medium text-zinc-700 hover:text-fuchsia-700">
           Leagues
         </a>
-        <a href="/admin/leagues/new" className="font-medium">
+        <a href="/admin/leagues/new" className="font-medium text-zinc-700 hover:text-fuchsia-700">
           + New League
         </a>
-        <a href="/dashboard" className="ml-auto font-medium">
+        <a href="/dashboard" className="ml-auto font-medium text-zinc-700 hover:text-fuchsia-700">
           ← Back to app
         </a>
       </nav>
-      <div className="p-4">{children}</div>
+      <div className="mx-auto max-w-5xl p-4">{children}</div>
     </div>
   )
 }

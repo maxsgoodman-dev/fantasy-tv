@@ -23,8 +23,14 @@ export async function updateShow(showId: string, formData: FormData) {
   const { supabase } = await requireAdmin()
   const name = String(formData.get('name'))
   const description = String(formData.get('description') ?? '')
-  await supabase.from('shows').update({ name, description }).eq('id', showId)
+  const themeColor = String(formData.get('themeColor') ?? '#a21caf')
+  const themeFont = String(formData.get('themeFont') ?? 'bold')
+  await supabase
+    .from('shows')
+    .update({ name, description, theme_color: themeColor, theme_font: themeFont })
+    .eq('id', showId)
   revalidatePath('/admin/shows')
+  revalidatePath('/dashboard')
 }
 
 export async function deleteShow(showId: string) {

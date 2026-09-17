@@ -22,7 +22,7 @@ export default async function ProfilePage() {
 
   return (
     <div className="flex max-w-xl flex-col gap-10">
-      <section className="flex flex-col gap-4">
+      <section className="card flex flex-col gap-4 p-4">
         <h1 className="text-2xl font-bold">Your profile</h1>
         <div className="flex items-center gap-4">
           <Avatar url={profile?.avatar_url} name={profile?.display_name} size={64} />
@@ -63,7 +63,7 @@ export default async function ProfilePage() {
         {memberships?.map((m) => {
           const league = m.leagues as unknown as { name: string } | null
           return (
-            <div key={m.league_id} className="flex flex-col gap-3 rounded border p-4">
+            <div key={m.league_id} className="card flex flex-col gap-3 p-4">
               <div className="flex items-center gap-3">
                 <Avatar url={m.avatar_url ?? profile?.avatar_url} name={m.display_name ?? profile?.display_name} size={40} />
                 <span className="font-semibold">{league?.name}</span>

@@ -16,7 +16,7 @@ export default async function ShowsPage() {
   const supabase = await createClient()
   const { data: shows } = await supabase
     .from('shows')
-    .select('id, name, description, image_url, seasons(id, name, year)')
+    .select('id, name, description, image_url, theme_color, theme_font, seasons(id, name, year)')
     .order('name')
 
   return (
@@ -28,7 +28,7 @@ export default async function ShowsPage() {
       </form>
 
       {shows?.map((show) => (
-        <div key={show.id} className="rounded border p-4">
+        <div key={show.id} className="card p-4">
           <div className="flex flex-wrap items-start gap-4">
             {show.image_url ? (
               <img
@@ -60,7 +60,7 @@ export default async function ShowsPage() {
 
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <form
-              key={`${show.id}:${show.name}:${show.description}`}
+              key={`${show.id}:${show.name}:${show.description}:${show.theme_color}:${show.theme_font}`}
               action={updateShow.bind(null, show.id)}
               className="flex flex-1 flex-wrap items-center gap-2"
             >
@@ -76,6 +76,23 @@ export default async function ShowsPage() {
                 placeholder="Description"
                 className="flex-1 rounded border p-2"
               />
+              <label className="flex items-center gap-1 text-xs text-zinc-600">
+                Accent
+                <input
+                  type="color"
+                  name="themeColor"
+                  defaultValue={show.theme_color}
+                  className="h-8 w-10 rounded border p-0"
+                />
+              </label>
+              <select
+                name="themeFont"
+                defaultValue={show.theme_font}
+                className="rounded border p-2 text-sm"
+              >
+                <option value="bold">Bold &amp; dramatic</option>
+                <option value="playful">Playful &amp; soft</option>
+              </select>
               <button type="submit" className="rounded bg-fuchsia-600 px-3 py-1 text-sm text-white">
                 Save
               </button>

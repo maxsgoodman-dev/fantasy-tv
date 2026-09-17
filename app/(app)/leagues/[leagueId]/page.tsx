@@ -139,7 +139,7 @@ export default async function LeaguePage({ params }: { params: Promise<{ leagueI
               </div>
             )
             return (
-              <div key={q.id} className="flex flex-col gap-3 rounded border p-4">
+              <div key={q.id} className="card flex flex-col gap-3 p-4">
                 <div>
                   <p className="font-semibold">
                     {episode ? `Episode ${episode.episode_number}: ` : ''}
@@ -240,7 +240,7 @@ export default async function LeaguePage({ params }: { params: Promise<{ leagueI
             </div>
           )
           return (
-            <div key={m.id} className="flex flex-col gap-2 rounded border p-4">
+            <div key={m.id} className="card flex flex-col gap-2 p-4">
               <p className="text-xs font-semibold text-zinc-500">
                 Round {m.round}, Match {m.matchup_index + 1}
               </p>
@@ -288,7 +288,7 @@ function EpisodesSection({
   episodes: { id: string; episode_number: number; air_date: string; status: string }[] | null
 }) {
   return (
-    <section>
+    <section className="card p-4">
       <h2 className="text-xl font-bold">Episodes</h2>
       <ul className="mt-2 flex flex-col gap-1">
         {episodes?.map((e) => (
@@ -345,7 +345,7 @@ function StandingsSection({
     .sort((a, b) => b.total - a.total)
 
   return (
-    <section>
+    <section className="card p-4">
       <h2 className="text-xl font-bold">Standings</h2>
       <ol className="mt-2 flex flex-col gap-2">
         {standings.map((s) => (

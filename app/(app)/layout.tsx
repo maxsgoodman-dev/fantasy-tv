@@ -18,7 +18,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div>
-      <header className="flex flex-wrap items-center justify-between gap-4 bg-fuchsia-700 p-4 text-white">
+      <header className="flex flex-wrap items-center justify-between gap-4 bg-gradient-to-r from-fuchsia-700 via-purple-700 to-fuchsia-800 p-4 text-white shadow-md">
         <div className="flex items-center gap-6">
           <a href="/dashboard" className="font-bold">
             Fantasy TV
@@ -50,7 +50,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </form>
         </div>
       </header>
-      <main className="p-4">{children}</main>
+      <main className="mx-auto max-w-5xl p-4">{children}</main>
     </div>
   )
 }
