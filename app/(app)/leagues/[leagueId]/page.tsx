@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { saveLineup, saveDraft } from './actions'
 import { Avatar } from '@/components/avatar'
 import { TeamPicker } from '@/components/team-picker'
+import { ContestantBios } from '@/components/contestant-bios'
 import { scoreWeeklyLineup } from '@/lib/scoring/weekly-team'
 
 export const dynamic = 'force-dynamic'
@@ -62,7 +63,7 @@ export default async function LeaguePage({ params }: { params: Promise<{ leagueI
 
   const { data: contestants } = await supabase
     .from('contestants')
-    .select('id, name, photo_url')
+    .select('id, name, photo_url, age, location, occupation, bio')
     .eq('season_id', league!.season_id)
     .order('name')
 
@@ -114,6 +115,8 @@ export default async function LeaguePage({ params }: { params: Promise<{ leagueI
             </a>
           )}
         </div>
+
+        <ContestantBios contestants={contestants ?? []} />
 
         <section className="flex flex-col gap-4">
           <h2 className="text-xl font-bold">Set your weekly team</h2>
@@ -214,6 +217,8 @@ export default async function LeaguePage({ params }: { params: Promise<{ leagueI
           </a>
         )}
       </div>
+
+      <ContestantBios contestants={contestants ?? []} />
 
       <section className="flex flex-col gap-4">
         <h2 className="text-xl font-bold">Your season draft</h2>
