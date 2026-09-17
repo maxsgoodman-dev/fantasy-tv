@@ -75,3 +75,27 @@ a {
 a:hover {
   opacity: 0.8;
 }
+
+/* Native file inputs render as bare text ("No file chosen") with no visible
+   affordance that the button part is clickable. Style the button part
+   consistently everywhere a file input is used. */
+input[type='file'] {
+  font-size: 0.875rem;
+}
+
+input[type='file']::file-selector-button {
+  cursor: pointer;
+  border: none;
+  border-radius: 9999px;
+  padding: 0.4rem 0.9rem;
+  margin-right: 0.75rem;
+  font-weight: 600;
+  font-size: 0.8125rem;
+  background-color: #c026d3;
+  color: white;
+  transition: filter 150ms ease;
+}
+
+input[type='file']::file-selector-button:hover {
+  filter: brightness(1.1);
+}

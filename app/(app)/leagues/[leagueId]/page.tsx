@@ -1,12 +1,11 @@
 import { createClient } from '@/lib/supabase/server'
 import { saveLineup, saveDraft } from './actions'
 import { Avatar } from '@/components/avatar'
+import { TeamPicker } from '@/components/team-picker'
 import { scoreWeeklyLineup } from '@/lib/scoring/weekly-team'
 import { scoreDraftPick, type Elimination } from '@/lib/scoring/survival-draft'
 
 export const dynamic = 'force-dynamic'
-
-type ContestantLite = { id: string; name: string; photo_url: string | null }
 
 function ContestantPhoto({ url, name }: { url: string | null; name: string }) {
   if (url) {
@@ -17,32 +16,6 @@ function ContestantPhoto({ url, name }: { url: string | null; name: string }) {
     <div className="flex h-24 w-24 items-center justify-center rounded-lg bg-zinc-200 text-center text-xs text-zinc-500 sm:h-32 sm:w-32">
       No photo
     </div>
-  )
-}
-
-function ContestantCheckbox({
-  contestant,
-  checked,
-}: {
-  contestant: ContestantLite
-  checked: boolean
-}) {
-  return (
-    <label
-      className={`flex cursor-pointer flex-col items-center gap-1 rounded-lg border-2 p-2 text-sm sm:text-base ${
-        checked ? 'border-fuchsia-600 bg-fuchsia-50' : 'border-transparent'
-      }`}
-    >
-      <input
-        type="checkbox"
-        name="contestantId"
-        value={contestant.id}
-        defaultChecked={checked}
-        className="sr-only"
-      />
-      <ContestantPhoto url={contestant.photo_url} name={contestant.name} />
-      <span>{contestant.name}</span>
-    </label>
   )
 }
 
@@ -145,13 +118,11 @@ export default async function LeaguePage({ params }: { params: Promise<{ leagueI
               <form key={ep.id} action={saveLineup.bind(null, leagueId, ep.id)} className="card flex flex-col gap-3 p-4">
                 <div>
                   <p className="font-semibold">Episode {ep.episode_number}</p>
-                  <p className="text-xs text-zinc-500">Locks {formatAirDate(ep.air_date)}</p>
+                  <p className="mt-1 inline-flex w-fit items-center gap-1 rounded-full bg-amber-100 px-2 py-1 text-xs font-bold text-amber-800">
+                    ⏰ Locks {formatAirDate(ep.air_date)}
+                  </p>
                 </div>
-                <div className="flex flex-wrap gap-3">
-                  {contestants?.map((c) => (
-                    <ContestantCheckbox key={c.id} contestant={c} checked={myPickIds.has(c.id)} />
-                  ))}
-                </div>
+                <TeamPicker contestants={contestants ?? []} initialSelectedIds={Array.from(myPickIds)} />
                 <button
                   type="submit"
                   className="w-fit rounded bg-fuchsia-600 px-4 py-2 text-sm font-semibold text-white"
@@ -237,15 +208,13 @@ export default async function LeaguePage({ params }: { params: Promise<{ leagueI
         ) : (
           <form action={saveDraft.bind(null, leagueId)} className="card flex flex-col gap-3 p-4">
             <p className="text-sm text-zinc-600">
-              Pick your team for the season. Locks when Episode 2 airs
-              {draftLockEpisode ? ` (${formatAirDate(draftLockEpisode.air_date)})` : ''}. You can change your
-              picks any time before then.
+              Pick your team for the season. You can change your picks any time before the draft locks.
             </p>
-            <div className="flex flex-wrap gap-3">
-              {contestants?.map((c) => (
-                <ContestantCheckbox key={c.id} contestant={c} checked={myPickIds.has(c.id)} />
-              ))}
-            </div>
+            <p className="inline-flex w-fit items-center gap-1 rounded-full bg-amber-100 px-2 py-1 text-xs font-bold text-amber-800">
+              ⏰ Locks when Episode 2 airs
+              {draftLockEpisode ? ` (${formatAirDate(draftLockEpisode.air_date)})` : ''}
+            </p>
+            <TeamPicker contestants={contestants ?? []} initialSelectedIds={Array.from(myPickIds)} />
             <button
               type="submit"
               className="w-fit rounded bg-fuchsia-600 px-4 py-2 text-sm font-semibold text-white"

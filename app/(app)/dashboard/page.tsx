@@ -35,7 +35,7 @@ export default async function DashboardPage() {
         {memberships?.length === 0 && (
           <p className="text-zinc-600">You haven&apos;t joined any leagues yet — enter a join code above.</p>
         )}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
           {memberships?.map((m) => {
             const league = m.leagues as unknown as {
               id: string
@@ -55,7 +55,7 @@ export default async function DashboardPage() {
                 style={{ borderColor: accent }}
               >
                 <div
-                  className="relative flex h-32 items-end overflow-hidden"
+                  className="relative flex h-56 items-end overflow-hidden"
                   style={{ backgroundColor: accent }}
                 >
                   {show?.image_url && (
@@ -63,24 +63,22 @@ export default async function DashboardPage() {
                     <img
                       src={show.image_url}
                       alt={show.name}
-                      className="absolute inset-0 h-full w-full object-cover opacity-60"
+                      className="absolute inset-0 h-full w-full object-cover opacity-90"
                     />
                   )}
-                  <div
-                    className="relative w-full bg-gradient-to-t from-black/70 to-transparent p-3"
-                  >
-                    <p className="text-xs font-semibold uppercase tracking-wide text-white/80">
+                  <div className="relative w-full bg-gradient-to-t from-black/80 via-black/20 to-transparent p-4">
+                    <p className="text-sm font-semibold uppercase tracking-wide text-white/90">
                       {show?.name}
                       {league.seasons?.year ? ` · ${league.seasons.year}` : ''}
                     </p>
                   </div>
                 </div>
-                <div className="flex flex-1 flex-col gap-2 p-4">
-                  <h3 className={`${fontClass} text-2xl leading-tight`} style={{ color: accent }}>
+                <div className="flex flex-1 flex-col gap-3 p-5">
+                  <h3 className={`${fontClass} text-3xl leading-tight`} style={{ color: accent }}>
                     {league.name}
                   </h3>
                   <span
-                    className="w-fit rounded-full px-2 py-0.5 text-xs font-semibold text-white"
+                    className="w-fit rounded-full px-3 py-1 text-sm font-semibold text-white"
                     style={{ backgroundColor: accent }}
                   >
                     {league.format === 'bracket' ? 'Season draft' : 'Weekly team'}
