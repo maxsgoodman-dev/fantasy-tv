@@ -30,7 +30,17 @@ export async function checkSourceNow(sourceId: string) {
     .eq('id', sourceId)
     .single()
   if (!source) return
-  await checkSource(supabase, source as WikiSourceRow)
+
+  try {
+    await checkSource(supabase, source as WikiSourceRow)
+    await supabase.from('show_wiki_sources').update({ last_error: null }).eq('id', sourceId)
+  } catch (err) {
+    await supabase
+      .from('show_wiki_sources')
+      .update({ last_error: String(err instanceof Error ? err.message : err), last_checked_at: new Date().toISOString() })
+      .eq('id', sourceId)
+  }
+
   revalidatePath('/admin/wiki-sources')
 }
 

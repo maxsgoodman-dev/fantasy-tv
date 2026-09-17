@@ -12,7 +12,9 @@ export default async function WikiSourcesPage() {
 
   const { data: sources } = await supabase
     .from('show_wiki_sources')
-    .select('id, url, parser, enabled, last_checked_at, last_changed_at, season_id, shows(name), seasons(name)')
+    .select(
+      'id, url, parser, enabled, last_checked_at, last_changed_at, last_error, season_id, shows(name), seasons(name)'
+    )
     .order('created_at', { ascending: false })
 
   const { data: ingestions } = await supabase
@@ -63,6 +65,7 @@ export default async function WikiSourcesPage() {
                     {' · '}
                     Last changed: {s.last_changed_at ? new Date(s.last_changed_at).toLocaleString() : 'never'}
                   </p>
+                  {s.last_error && <p className="text-xs font-semibold text-red-600">Error: {s.last_error}</p>}
                 </div>
                 <form action={checkSourceNow.bind(null, s.id)}>
                   <button type="submit" className="rounded bg-zinc-700 px-3 py-1.5 text-xs font-semibold text-white">

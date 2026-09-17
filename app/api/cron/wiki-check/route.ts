@@ -40,7 +40,12 @@ export async function GET(request: Request) {
         }
       }
     } catch (err) {
-      results.push({ sourceId: source.id, changed: false, eventCount: 0, error: String(err) })
+      const message = String(err instanceof Error ? err.message : err)
+      results.push({ sourceId: source.id, changed: false, eventCount: 0, error: message })
+      await supabase
+        .from('show_wiki_sources')
+        .update({ last_error: message, last_checked_at: new Date().toISOString() })
+        .eq('id', source.id)
     }
   }
 
