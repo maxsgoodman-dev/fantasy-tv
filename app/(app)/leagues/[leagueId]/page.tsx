@@ -1,27 +1,53 @@
 import { createClient } from '@/lib/supabase/server'
 import { submitPick, submitBracketPick } from './actions'
+import { Avatar } from '@/components/avatar'
 
 export const dynamic = 'force-dynamic'
 
-function ContestantPhoto({ url, name, size = 64 }: { url: string | null; name: string; size?: number }) {
+function ContestantPhoto({ url, name }: { url: string | null; name: string }) {
   if (url) {
     // eslint-disable-next-line @next/next/no-img-element
     return (
       <img
         src={url}
         alt={name}
-        style={{ width: size, height: size }}
-        className="rounded-lg object-cover"
+        className="h-24 w-24 rounded-lg object-cover sm:h-32 sm:w-32"
       />
     )
   }
   return (
-    <div
-      style={{ width: size, height: size }}
-      className="flex items-center justify-center rounded-lg bg-zinc-200 text-center text-xs text-zinc-500"
-    >
+    <div className="flex h-24 w-24 items-center justify-center rounded-lg bg-zinc-200 text-center text-xs text-zinc-500 sm:h-32 sm:w-32">
       No photo
     </div>
+  )
+}
+
+function ContestantPickButton({
+  action,
+  contestant,
+  selected,
+  disabled,
+  isWinner,
+}: {
+  action: (formData: FormData) => void | Promise<void>
+  contestant: { id: string; name: string; photo_url: string | null }
+  selected: boolean
+  disabled?: boolean
+  isWinner?: boolean
+}) {
+  return (
+    <form action={action}>
+      <button
+        type="submit"
+        disabled={disabled}
+        className={`flex flex-col items-center gap-1 rounded-lg border-2 p-2 text-sm sm:text-base ${
+          selected ? 'border-fuchsia-600 bg-fuchsia-50' : 'border-transparent'
+        } ${isWinner ? 'ring-2 ring-emerald-500' : ''}`}
+      >
+        <ContestantPhoto url={contestant.photo_url} name={contestant.name} />
+        <span>{contestant.name}</span>
+      </button>
+    </form>
   )
 }
 
@@ -50,7 +76,7 @@ export default async function LeaguePage({ params }: { params: Promise<{ leagueI
 
   const { data: members } = await supabase
     .from('league_members')
-    .select('user_id, profiles(display_name)')
+    .select('user_id, display_name, avatar_url, profiles(display_name, avatar_url)')
     .eq('league_id', leagueId)
 
   const { data: episodes } = await supabase
@@ -98,7 +124,20 @@ export default async function LeaguePage({ params }: { params: Promise<{ leagueI
           )}
           {openQuestions?.map((q) => {
             const episode = q.episodes as unknown as { episode_number: number } | null
-            const myPick = myPicks?.find((p) => p.weekly_question_id === q.id)?.picked_contestant_id
+            const myPickId = myPicks?.find((p) => p.weekly_question_id === q.id)?.picked_contestant_id
+            const myPickContestant = contestants?.find((c) => c.id === myPickId)
+            const grid = (
+              <div className="flex flex-wrap gap-3">
+                {contestants?.map((c) => (
+                  <ContestantPickButton
+                    key={c.id}
+                    action={submitPick.bind(null, leagueId, q.id, c.id)}
+                    contestant={c}
+                    selected={myPickId === c.id}
+                  />
+                ))}
+              </div>
+            )
             return (
               <div key={q.id} className="flex flex-col gap-3 rounded border p-4">
                 <div>
@@ -108,21 +147,31 @@ export default async function LeaguePage({ params }: { params: Promise<{ leagueI
                   </p>
                   <p className="text-xs text-zinc-500">Locks {formatAirDate(q.lock_at)}</p>
                 </div>
-                <div className="flex flex-wrap gap-3">
-                  {contestants?.map((c) => (
-                    <form key={c.id} action={submitPick.bind(null, leagueId, q.id, c.id)}>
-                      <button
-                        type="submit"
-                        className={`flex flex-col items-center gap-1 rounded-lg border-2 p-2 text-xs ${
-                          myPick === c.id ? 'border-fuchsia-600 bg-fuchsia-50' : 'border-transparent'
-                        }`}
-                      >
-                        <ContestantPhoto url={c.photo_url} name={c.name} />
-                        <span>{c.name}</span>
-                      </button>
-                    </form>
-                  ))}
-                </div>
+
+                {myPickContestant ? (
+                  <details className="group">
+                    <summary className="flex cursor-pointer list-none items-center gap-3">
+                      <span className="text-sm text-zinc-600">Your pick:</span>
+                      <span className="flex items-center gap-2 rounded-lg border-2 border-fuchsia-600 bg-fuchsia-50 p-1 pr-3">
+                        <img
+                          src={myPickContestant.photo_url ?? undefined}
+                          alt={myPickContestant.name}
+                          className="h-10 w-10 rounded object-cover"
+                        />
+                        <span className="text-sm font-semibold">{myPickContestant.name}</span>
+                      </span>
+                      <span className="text-sm font-semibold text-fuchsia-700 underline group-open:hidden">
+                        Edit pick
+                      </span>
+                      <span className="hidden text-sm font-semibold text-fuchsia-700 underline group-open:inline">
+                        Hide
+                      </span>
+                    </summary>
+                    <div className="mt-3">{grid}</div>
+                  </details>
+                ) : (
+                  grid
+                )}
               </div>
             )
           })}
@@ -168,34 +217,59 @@ export default async function LeaguePage({ params }: { params: Promise<{ leagueI
         {matchups?.map((m) => {
           const a = m.contestant_a as unknown as { id: string; name: string; photo_url: string | null } | null
           const b = m.contestant_b as unknown as { id: string; name: string; photo_url: string | null } | null
-          const myPick = myBracketPicks?.find((p) => p.matchup_id === m.id)?.predicted_winner_id
+          const myPickId = myBracketPicks?.find((p) => p.matchup_id === m.id)?.predicted_winner_id
+          const myPickContestant = [a, b].find((c) => c?.id === myPickId)
+          const cards = (
+            <div className="flex items-center gap-4">
+              {[a, b].map((c, i) =>
+                c ? (
+                  <ContestantPickButton
+                    key={c.id}
+                    action={submitBracketPick.bind(null, leagueId, m.id, c.id)}
+                    contestant={c}
+                    selected={myPickId === c.id}
+                    disabled={!!m.winner_id}
+                    isWinner={m.winner_id === c.id}
+                  />
+                ) : (
+                  <div key={`tbd-${i}`} className="text-sm text-zinc-400">
+                    TBD
+                  </div>
+                )
+              )}
+            </div>
+          )
           return (
             <div key={m.id} className="flex flex-col gap-2 rounded border p-4">
               <p className="text-xs font-semibold text-zinc-500">
                 Round {m.round}, Match {m.matchup_index + 1}
               </p>
-              <div className="flex items-center gap-4">
-                {[a, b].map((c, i) =>
-                  c ? (
-                    <form key={c.id} action={submitBracketPick.bind(null, leagueId, m.id, c.id)}>
-                      <button
-                        type="submit"
-                        disabled={!!m.winner_id}
-                        className={`flex flex-col items-center gap-1 rounded-lg border-2 p-2 text-xs ${
-                          myPick === c.id ? 'border-fuchsia-600 bg-fuchsia-50' : 'border-transparent'
-                        } ${m.winner_id === c.id ? 'ring-2 ring-emerald-500' : ''}`}
-                      >
-                        <ContestantPhoto url={c.photo_url} name={c.name} />
-                        <span>{c.name}</span>
-                      </button>
-                    </form>
-                  ) : (
-                    <div key={`tbd-${i}`} className="text-sm text-zinc-400">
-                      TBD
-                    </div>
-                  )
-                )}
-              </div>
+
+              {myPickContestant && !m.winner_id ? (
+                <details className="group">
+                  <summary className="flex cursor-pointer list-none items-center gap-3">
+                    <span className="text-sm text-zinc-600">Your pick:</span>
+                    <span className="flex items-center gap-2 rounded-lg border-2 border-fuchsia-600 bg-fuchsia-50 p-1 pr-3">
+                      <img
+                        src={myPickContestant.photo_url ?? undefined}
+                        alt={myPickContestant.name}
+                        className="h-10 w-10 rounded object-cover"
+                      />
+                      <span className="text-sm font-semibold">{myPickContestant.name}</span>
+                    </span>
+                    <span className="text-sm font-semibold text-fuchsia-700 underline group-open:hidden">
+                      Edit pick
+                    </span>
+                    <span className="hidden text-sm font-semibold text-fuchsia-700 underline group-open:inline">
+                      Hide
+                    </span>
+                  </summary>
+                  <div className="mt-3">{cards}</div>
+                </details>
+              ) : (
+                cards
+              )}
+
               {m.winner_id && <p className="text-xs font-semibold text-emerald-600">Winner decided</p>}
             </div>
           )
@@ -218,7 +292,7 @@ function EpisodesSection({
       <h2 className="text-xl font-bold">Episodes</h2>
       <ul className="mt-2 flex flex-col gap-1">
         {episodes?.map((e) => (
-          <li key={e.id} className="flex items-center gap-3 text-sm">
+          <li key={e.id} className="flex flex-wrap items-center gap-3 text-sm">
             <span className="w-16 font-semibold">Ep. {e.episode_number}</span>
             <span className="text-zinc-600">{formatAirDate(e.air_date)}</span>
             <span
@@ -244,7 +318,14 @@ function StandingsSection({
   standingsSource,
   currentUserId,
 }: {
-  members: { user_id: string; profiles: unknown }[] | null
+  members:
+    | {
+        user_id: string
+        display_name: string | null
+        avatar_url: string | null
+        profiles: unknown
+      }[]
+    | null
   standingsSource: { user_id: string; points_awarded: number }[]
   currentUserId: string
 }) {
@@ -253,9 +334,11 @@ function StandingsSection({
       const total = standingsSource
         .filter((p) => p.user_id === m.user_id)
         .reduce((sum, p) => sum + p.points_awarded, 0)
+      const profile = m.profiles as unknown as { display_name: string; avatar_url: string | null } | null
       return {
         userId: m.user_id,
-        name: (m.profiles as unknown as { display_name: string })?.display_name,
+        name: m.display_name ?? profile?.display_name ?? 'Member',
+        avatarUrl: m.avatar_url ?? profile?.avatar_url ?? null,
         total,
       }
     })
@@ -264,10 +347,16 @@ function StandingsSection({
   return (
     <section>
       <h2 className="text-xl font-bold">Standings</h2>
-      <ol className="list-decimal pl-6">
+      <ol className="mt-2 flex flex-col gap-2">
         {standings.map((s) => (
-          <li key={s.userId} className={s.userId === currentUserId ? 'font-bold' : ''}>
-            {s.name}: {s.total} pts
+          <li
+            key={s.userId}
+            className={`flex items-center gap-2 ${s.userId === currentUserId ? 'font-bold' : ''}`}
+          >
+            <Avatar url={s.avatarUrl} name={s.name} size={28} />
+            <span>
+              {s.name}: {s.total} pts
+            </span>
           </li>
         ))}
       </ol>

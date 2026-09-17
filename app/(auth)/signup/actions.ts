@@ -12,7 +12,7 @@ const SignupSchema = z.object({
   displayName: z.string().min(1).max(50),
 })
 
-export type SignupState = { error?: string }
+export type SignupState = { error?: string; confirmationSent?: boolean }
 
 export async function signup(_prevState: SignupState, formData: FormData): Promise<SignupState> {
   const parsed = SignupSchema.safeParse({
@@ -25,13 +25,21 @@ export async function signup(_prevState: SignupState, formData: FormData): Promi
   }
 
   const supabase = await createClient()
-  const { error } = await supabase.auth.signUp({
+  const { data, error } = await supabase.auth.signUp({
     email: parsed.data.email,
     password: parsed.data.password,
     options: { data: { display_name: parsed.data.displayName } },
   })
   if (error) {
     return { error: error.message }
+  }
+
+  // If email confirmation is required, Supabase returns a user but no
+  // session — nothing to redirect into yet, so tell the user to check
+  // their inbox instead. (If confirmation isn't required, a session comes
+  // back immediately and we fall through to the normal redirect below.)
+  if (!data.session) {
+    return { confirmationSent: true }
   }
 
   try {
