@@ -5,6 +5,7 @@ import { suggestEventsFromTranscript, ELIMINATED_CODE, type SuggestedEvent } fro
 import { rulesetForShowName, findRuleAcrossSets } from '@/lib/scoring/rulesets'
 import { postScoredEvent, markEliminated } from '@/lib/scoring/post-event'
 import { revalidatePath } from 'next/cache'
+import { redirect } from 'next/navigation'
 
 async function loadEpisodeContext(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -43,11 +44,17 @@ export async function uploadTranscript(episodeId: string, formData: FormData) {
   const rawText = String(formData.get('rawText'))
 
   const { rules, contestants } = await loadEpisodeContext(supabase, episodeId)
-  const suggestedEvents = await suggestEventsFromTranscript(
-    rawText,
-    rules,
-    contestants.map((c) => c.name)
-  )
+  let suggestedEvents: SuggestedEvent[]
+  try {
+    suggestedEvents = await suggestEventsFromTranscript(
+      rawText,
+      rules,
+      contestants.map((c) => c.name)
+    )
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    redirect(`/admin/episodes/${episodeId}/transcript?error=${encodeURIComponent(message.slice(0, 300))}`)
+  }
 
   await supabase.from('transcript_uploads').insert({
     episode_id: episodeId,

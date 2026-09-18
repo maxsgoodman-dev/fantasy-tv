@@ -4,8 +4,15 @@ import { findRuleAcrossSets } from '@/lib/scoring/rulesets'
 
 export const dynamic = 'force-dynamic'
 
-export default async function TranscriptPage({ params }: { params: Promise<{ episodeId: string }> }) {
+export default async function TranscriptPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ episodeId: string }>
+  searchParams: Promise<{ error?: string }>
+}) {
   const { episodeId } = await params
+  const { error } = await searchParams
   const supabase = await createClient()
 
   const { data: uploads } = await supabase
@@ -22,6 +29,11 @@ export default async function TranscriptPage({ params }: { params: Promise<{ epi
         Claude reads the transcript against this show&apos;s scoring rulebook and suggests events. Approving
         posts them as real scores (and marks anyone knocked out as eliminated).
       </p>
+      {error && (
+        <p className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          Couldn&apos;t parse the transcript: {error}
+        </p>
+      )}
       <form action={uploadTranscript.bind(null, episodeId)} className="flex flex-col gap-2">
         <textarea
           name="rawText"
