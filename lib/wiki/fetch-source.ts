@@ -11,11 +11,16 @@ export async function fetchWikiHtml(url: string): Promise<string> {
 
   if (apiKey) {
     const proxied = `https://api.scraperapi.com/?api_key=${encodeURIComponent(apiKey)}&url=${encodeURIComponent(url)}&render=true`
-    const res = await fetch(proxied, { cache: 'no-store' })
-    if (!res.ok) {
-      throw new Error(`ScraperAPI fetch failed for ${url}: ${res.status} ${res.statusText}`)
+    // ScraperAPI occasionally returns a transient 500 on hard-to-render pages;
+    // their docs recommend retrying.
+    let lastStatus = ''
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      const res = await fetch(proxied, { cache: 'no-store' })
+      if (res.ok) return res.text()
+      lastStatus = `${res.status} ${res.statusText}`
+      if (res.status < 500) break
     }
-    return res.text()
+    throw new Error(`ScraperAPI fetch failed for ${url}: ${lastStatus}`)
   }
 
   const res = await fetch(url, {
