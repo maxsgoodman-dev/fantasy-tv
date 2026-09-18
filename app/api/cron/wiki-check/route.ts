@@ -4,6 +4,8 @@ import { checkSource, type WikiSourceRow } from '@/lib/wiki/check-source'
 import { resend, EMAIL_FROM } from '@/lib/email/resend'
 import { wikiChangesEmail } from '@/lib/email/templates'
 
+export const maxDuration = 120
+
 export async function GET(request: Request) {
   const authHeader = request.headers.get('authorization')
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {

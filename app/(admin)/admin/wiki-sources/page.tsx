@@ -4,6 +4,7 @@ import { WikiSourceForm } from '@/components/wiki-source-form'
 import type { SuggestedEvent } from '@/lib/wiki/types'
 
 export const dynamic = 'force-dynamic'
+export const maxDuration = 60
 
 export default async function WikiSourcesPage() {
   const supabase = await createClient()
