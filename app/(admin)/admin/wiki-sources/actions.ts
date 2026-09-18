@@ -3,6 +3,7 @@
 import { requireAdmin } from '@/lib/auth/require-admin'
 import { checkSource, type WikiSourceRow } from '@/lib/wiki/check-source'
 import type { SuggestedEvent } from '@/lib/wiki/types'
+import { postScoredEvent, markEliminated } from '@/lib/scoring/post-event'
 import { revalidatePath } from 'next/cache'
 
 export async function addSource(formData: FormData) {
@@ -26,7 +27,7 @@ export async function checkSourceNow(sourceId: string) {
   const { supabase } = await requireAdmin()
   const { data: source } = await supabase
     .from('show_wiki_sources')
-    .select('id, season_id, url, parser, last_snapshot')
+    .select('id, season_id, url, parser, last_snapshot, last_revid')
     .eq('id', sourceId)
     .single()
   if (!source) return
@@ -100,19 +101,12 @@ export async function approveWikiEvent(ingestionId: string, eventIndex: number, 
   if (!episode) return
 
   if (event.kind === 'eliminated') {
-    await supabase.from('episode_events').insert({
-      episode_id: episode.id,
-      contestant_id: contestant.id,
-      event_type: 'eliminated',
-      description: event.label,
-    })
+    await markEliminated(supabase, episode.id, contestant.id, event.label)
   } else {
-    await supabase.from('contestant_episode_events').insert({
-      episode_id: episode.id,
-      contestant_id: contestant.id,
-      event_code: event.eventCode,
-      label: event.label,
-      points: event.points,
+    await postScoredEvent(supabase, {
+      episodeId: episode.id,
+      contestantId: contestant.id,
+      rule: { code: event.eventCode, label: event.label, points: event.points },
     })
   }
 

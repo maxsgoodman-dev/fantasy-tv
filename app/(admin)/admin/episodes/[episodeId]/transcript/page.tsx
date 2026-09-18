@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { uploadTranscript, approveTranscriptUpload } from './actions'
+import { findRuleAcrossSets } from '@/lib/scoring/rulesets'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,10 +14,14 @@ export default async function TranscriptPage({ params }: { params: Promise<{ epi
     .eq('episode_id', episodeId)
     .order('created_at', { ascending: false })
 
-  type Suggested = { eventType: string; contestantName: string; description: string }
+  type Suggested = { eventCode: string; contestantName: string; description: string }
 
   return (
     <div className="flex flex-col gap-6">
+      <p className="text-sm text-zinc-600">
+        Claude reads the transcript against this show&apos;s scoring rulebook and suggests events. Approving
+        posts them as real scores (and marks anyone knocked out as eliminated).
+      </p>
       <form action={uploadTranscript.bind(null, episodeId)} className="flex flex-col gap-2">
         <textarea
           name="rawText"
@@ -33,9 +38,22 @@ export default async function TranscriptPage({ params }: { params: Promise<{ epi
       {uploads?.map((u) => (
         <div key={u.id} className="rounded border p-4">
           <p className="mb-2">Status: {u.status}</p>
+          {((u.suggested_events ?? []) as Suggested[]).length === 0 && (
+            <p className="text-sm text-zinc-500">No scoreable events found.</p>
+          )}
           <ul className="list-disc pl-6">
             {((u.suggested_events ?? []) as Suggested[]).map((s, i) => (
-              <li key={i}>{s.eventType} — {s.contestantName}: {s.description}</li>
+              <li key={i}>
+                <span className="font-semibold">
+                  {findRuleAcrossSets(s.eventCode)
+                    ? `${findRuleAcrossSets(s.eventCode)!.points > 0 ? '+' : ''}${findRuleAcrossSets(s.eventCode)!.points}`
+                    : s.eventCode === 'eliminated'
+                      ? 'OUT'
+                      : '?'}
+                </span>{' '}
+                {s.contestantName} — {s.description}{' '}
+                <span className="text-xs text-zinc-500">[{s.eventCode}]</span>
+              </li>
             ))}
           </ul>
           {u.status === 'pending' && (

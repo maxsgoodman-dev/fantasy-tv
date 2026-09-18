@@ -1,4 +1,4 @@
-import { fetchWikiHtml } from './fetch-source'
+import { fetchWikiPage } from './fetch-source'
 import { parseBakeoffWiki, diffBakeoffSnapshots, type BakeoffSnapshot } from './parse-bakeoff-wiki'
 import { parseTraitorsWiki, diffTraitorsSnapshots, type TraitorsSnapshot } from './parse-traitors-wiki'
 import type { SuggestedEvent, WikiParser } from './types'
@@ -9,6 +9,7 @@ export type WikiSourceRow = {
   url: string
   parser: WikiParser
   last_snapshot: unknown
+  last_revid?: string | null
 }
 
 /**
@@ -23,7 +24,16 @@ export async function checkSource(
 ): Promise<{ changed: boolean; eventCount: number }> {
   if (!source.season_id) return { changed: false, eventCount: 0 }
 
-  const html = await fetchWikiHtml(source.url)
+  const { html, revid } = await fetchWikiPage(source.url)
+
+  // Same wiki revision as last time: nothing was edited, skip all the work.
+  if (revid && revid === source.last_revid) {
+    await supabase
+      .from('show_wiki_sources')
+      .update({ last_checked_at: new Date().toISOString(), last_error: null })
+      .eq('id', source.id)
+    return { changed: false, eventCount: 0 }
+  }
 
   const { data: contestants } = await supabase
     .from('contestants')
@@ -60,6 +70,7 @@ export async function checkSource(
     .from('show_wiki_sources')
     .update({
       last_snapshot: nextSnapshot,
+      last_revid: revid,
       last_checked_at: now,
       ...(events.length > 0 ? { last_changed_at: now } : {}),
     })

@@ -28,6 +28,10 @@ export default async function EpisodeResultsPage({ params }: { params: Promise<{
     <div className="flex flex-col gap-6">
       <h1 className="text-2xl font-bold">Episode {episode?.episode_number} results ({episode?.status})</h1>
 
+      <a href={`/admin/episodes/${episodeId}/transcript`} className="w-fit rounded bg-zinc-700 px-3 py-1.5 text-sm font-semibold text-white">
+        Score from a transcript
+      </a>
+
       <ul className="list-disc pl-6">
         {events?.map((e) => (
           <li key={e.id}>

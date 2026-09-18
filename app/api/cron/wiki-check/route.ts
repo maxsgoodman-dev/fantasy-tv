@@ -20,12 +20,13 @@ export async function GET(request: Request) {
 
   const { data: sources } = await supabase
     .from('show_wiki_sources')
-    .select('id, season_id, url, parser, last_snapshot, shows(name)')
+    .select('id, season_id, url, parser, last_snapshot, last_revid, shows(name)')
     .eq('enabled', true)
 
   const results: { sourceId: string; changed: boolean; eventCount: number; error?: string }[] = []
 
-  for (const source of sources ?? []) {
+  await Promise.all(
+    (sources ?? []).map(async (source) => {
     try {
       const { changed, eventCount } = await checkSource(supabase, source as WikiSourceRow)
       results.push({ sourceId: source.id, changed, eventCount })
@@ -49,7 +50,8 @@ export async function GET(request: Request) {
         .update({ last_error: message, last_checked_at: new Date().toISOString() })
         .eq('id', source.id)
     }
-  }
+    })
+  )
 
   return NextResponse.json({ results })
 }

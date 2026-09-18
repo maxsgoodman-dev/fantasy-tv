@@ -2,6 +2,7 @@
 
 import { requireAdmin } from '@/lib/auth/require-admin'
 import { findRuleAcrossSets } from '@/lib/scoring/rulesets'
+import { postScoredEvent } from '@/lib/scoring/post-event'
 import { revalidatePath } from 'next/cache'
 
 export async function logContestantEvent(leagueId: string, episodeId: string, formData: FormData) {
@@ -12,13 +13,7 @@ export async function logContestantEvent(leagueId: string, episodeId: string, fo
   const rule = findRuleAcrossSets(eventCode)
   if (!rule) return
 
-  await supabase.from('contestant_episode_events').insert({
-    episode_id: episodeId,
-    contestant_id: contestantId,
-    event_code: rule.code,
-    label: rule.label,
-    points: rule.points,
-  })
+  await postScoredEvent(supabase, { episodeId, contestantId, rule })
 
   revalidatePath(`/admin/leagues/${leagueId}/questions`)
   revalidatePath(`/leagues/${leagueId}`)
