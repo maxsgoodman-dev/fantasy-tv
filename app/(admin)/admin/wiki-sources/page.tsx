@@ -32,7 +32,10 @@ export default async function WikiSourcesPage() {
         Watches a show&apos;s wiki page, diffs it against what it looked like last time, and queues
         matched scoring events here for approval — nothing posts to a league&apos;s scores until you
         approve it. Runs automatically once a day via cron, or hit &quot;Check now&quot; right after an
-        episode airs for an immediate check.
+        episode airs for an immediate check. Fandom pages sit behind Cloudflare&apos;s bot challenge, so
+        fetching them requires a <code className="rounded bg-zinc-100 px-1">SCRAPERAPI_KEY</code>{' '}
+        environment variable (free tier at scraperapi.com covers this easily) — without it, checks against
+        Fandom sources will fail with a 403.
       </p>
 
       <section className="card flex flex-col gap-4 p-4">
