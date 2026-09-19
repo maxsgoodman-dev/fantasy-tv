@@ -3,6 +3,7 @@
 :root {
   --background: #f4f4f6;
   --foreground: #171717;
+  color-scheme: light dark;
 }
 
 @theme inline {
@@ -98,4 +99,45 @@ input[type='file']::file-selector-button {
 
 input[type='file']::file-selector-button:hover {
   filter: brightness(1.1);
+}
+
+/* Shared light/dark surface for bars that used a hard-coded white background. */
+.surface {
+  background: white;
+}
+
+/* Dark mode: the page text turns light, so every light surface and every
+   neutral-gray text shade used across the app needs a dark counterpart —
+   otherwise light text lands on white cards and becomes unreadable. These
+   are unlayered, so they win over Tailwind's layered utilities. */
+@media (prefers-color-scheme: dark) {
+  .card {
+    background: #18181b;
+    border-color: #3f3f46;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  }
+
+  .surface {
+    background: #18181b;
+  }
+
+  .text-zinc-300 { color: #52525b; }
+  .text-zinc-400 { color: #a1a1aa; }
+  .text-zinc-500 { color: #a1a1aa; }
+  .text-zinc-600 { color: #d4d4d8; }
+  .text-zinc-700 { color: #e4e4e7; }
+
+  .bg-zinc-50 { background-color: #27272a; }
+  .bg-zinc-100 { background-color: #27272a; }
+  .bg-zinc-200 { background-color: #3f3f46; }
+
+  .border-zinc-100,
+  .divide-zinc-100 > :not(:last-child) {
+    border-color: #3f3f46;
+  }
+
+  .bg-fuchsia-50 { background-color: #3b0a45; }
+  .border-fuchsia-200 { border-color: #86198f; }
+
+  .hover\:text-fuchsia-700:hover { color: #e879f9; }
 }

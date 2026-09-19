@@ -6,7 +6,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   await requireAdmin()
   return (
     <div>
-      <nav className="flex flex-wrap items-center gap-4 border-b-2 border-fuchsia-200 bg-white p-4 shadow-sm">
+      <nav className="flex flex-wrap items-center gap-4 border-b-2 border-fuchsia-200 surface p-4 shadow-sm">
         <span className="rounded-full bg-fuchsia-700 px-3 py-1 text-sm font-bold text-white">Admin</span>
         <a href="/admin/shows" className="font-medium text-zinc-700 hover:text-fuchsia-700">
           Shows &amp; Seasons
