@@ -3,7 +3,10 @@ import { saveLineup, saveDraft } from './actions'
 import { Avatar } from '@/components/avatar'
 import { TeamPicker } from '@/components/team-picker'
 import { ContestantBios } from '@/components/contestant-bios'
+import { ScoringGuide } from '@/components/scoring-guide'
 import { scoreWeeklyLineup } from '@/lib/scoring/weekly-team'
+import { rulesetForShowName } from '@/lib/scoring/rulesets'
+import { effectivePoints, effectiveRules, readOverrides } from '@/lib/scoring/league-rules'
 
 export const dynamic = 'force-dynamic'
 
@@ -38,11 +41,21 @@ export default async function LeaguePage({ params }: { params: Promise<{ leagueI
 
   const { data: league } = await supabase
     .from('leagues')
-    .select('name, format, season_id, seasons(shows(id))')
+    .select('name, format, season_id, max_picks, scoring_overrides, seasons(shows(id, name))')
     .eq('id', leagueId)
     .single()
 
-  const showId = (league?.seasons as unknown as { shows: { id: string } } | null)?.shows?.id
+  const show = (league?.seasons as unknown as { shows: { id: string; name: string } } | null)?.shows
+  const showId = show?.id
+  const overrides = readOverrides(league?.scoring_overrides)
+  const maxPicks = league?.max_picks ?? null
+  const guide = (
+    <ScoringGuide
+      rules={effectiveRules(rulesetForShowName(show?.name), overrides)}
+      format={league?.format ?? ''}
+      maxPicks={maxPicks}
+    />
+  )
   const { count: historySeasonCount } = showId
     ? await supabase
         .from('show_history_seasons')
@@ -85,7 +98,7 @@ export default async function LeaguePage({ params }: { params: Promise<{ leagueI
 
     const { data: allEvents } = await supabase
       .from('contestant_episode_events')
-      .select('contestant_id, points, episode_id, episodes!inner(season_id)')
+      .select('contestant_id, points, event_code, episode_id, episodes!inner(season_id)')
       .eq('episodes.season_id', league.season_id)
 
     const standingsSource = (members ?? []).map((m) => {
@@ -96,7 +109,7 @@ export default async function LeaguePage({ params }: { params: Promise<{ leagueI
         }))
         const eventsForEpisode = (allEvents ?? [])
           .filter((e) => e.episode_id === lineup.episode_id)
-          .map((e) => ({ contestantId: e.contestant_id, points: e.points }))
+          .map((e) => ({ contestantId: e.contestant_id, points: effectivePoints(e.event_code, e.points, overrides) }))
         return sum + scoreWeeklyLineup(picks, eventsForEpisode)
       }, 0)
       return { user_id: m.user_id, points_awarded: total }
@@ -117,6 +130,8 @@ export default async function LeaguePage({ params }: { params: Promise<{ leagueI
         </div>
 
         <ContestantBios contestants={contestants ?? []} />
+
+        {guide}
 
         <section className="flex flex-col gap-4">
           <h2 className="text-xl font-bold">Set your weekly team</h2>
@@ -142,7 +157,7 @@ export default async function LeaguePage({ params }: { params: Promise<{ leagueI
                     ⏰ Locks {formatAirDate(ep.air_date)}
                   </p>
                 </div>
-                <TeamPicker contestants={contestants ?? []} initialSelectedIds={Array.from(myPickIds)} />
+                <TeamPicker contestants={contestants ?? []} initialSelectedIds={Array.from(myPickIds)} maxPicks={maxPicks} />
                 <button
                   type="submit"
                   className="w-fit rounded bg-fuchsia-600 px-4 py-2 text-sm font-semibold text-white"
@@ -182,12 +197,12 @@ export default async function LeaguePage({ params }: { params: Promise<{ leagueI
 
   const { data: allSeasonEvents } = await supabase
     .from('contestant_episode_events')
-    .select('contestant_id, points, episodes!inner(season_id)')
+    .select('contestant_id, points, event_code, episodes!inner(season_id)')
     .eq('episodes.season_id', league!.season_id)
 
   const seasonEventPoints = (allSeasonEvents ?? []).map((e) => ({
     contestantId: e.contestant_id,
-    points: e.points,
+    points: effectivePoints(e.event_code, e.points, overrides),
   }))
 
   const { data: allDraftPicks } = await supabase
@@ -219,6 +234,8 @@ export default async function LeaguePage({ params }: { params: Promise<{ leagueI
       </div>
 
       <ContestantBios contestants={contestants ?? []} />
+
+        {guide}
 
       <section className="flex flex-col gap-4">
         <h2 className="text-xl font-bold">Your season draft</h2>
@@ -255,7 +272,7 @@ export default async function LeaguePage({ params }: { params: Promise<{ leagueI
               ⏰ Locks when Episode 2 airs
               {draftLockEpisode ? ` (${formatAirDate(draftLockEpisode.air_date)})` : ''}
             </p>
-            <TeamPicker contestants={contestants ?? []} initialSelectedIds={Array.from(myPickIds)} />
+            <TeamPicker contestants={contestants ?? []} initialSelectedIds={Array.from(myPickIds)} maxPicks={maxPicks} />
             <button
               type="submit"
               className="w-fit rounded bg-fuchsia-600 px-4 py-2 text-sm font-semibold text-white"

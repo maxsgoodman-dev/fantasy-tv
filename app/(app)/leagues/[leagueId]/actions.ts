@@ -3,6 +3,12 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 
+/** Dedupes and enforces the league's pick limit server-side (the UI limit can be bypassed). */
+function capPicks(ids: string[], maxPicks: number | null | undefined) {
+  const unique = Array.from(new Set(ids))
+  return maxPicks ? unique.slice(0, maxPicks) : unique
+}
+
 export async function saveLineup(leagueId: string, episodeId: string, formData: FormData) {
   const supabase = await createClient()
   const {
@@ -13,7 +19,8 @@ export async function saveLineup(leagueId: string, episodeId: string, formData: 
   const { data: episode } = await supabase.from('episodes').select('air_date').eq('id', episodeId).single()
   if (!episode || new Date(episode.air_date) <= new Date()) return // locked
 
-  const contestantIds = formData.getAll('contestantId') as string[]
+  const { data: league } = await supabase.from('leagues').select('max_picks').eq('id', leagueId).single()
+  const contestantIds = capPicks(formData.getAll('contestantId') as string[], league?.max_picks)
 
   const { data: lineup } = await supabase
     .from('weekly_lineups')
@@ -40,7 +47,7 @@ export async function saveDraft(leagueId: string, formData: FormData) {
   } = await supabase.auth.getUser()
   if (!user) return
 
-  const { data: league } = await supabase.from('leagues').select('season_id').eq('id', leagueId).single()
+  const { data: league } = await supabase.from('leagues').select('season_id, max_picks').eq('id', leagueId).single()
   if (!league) return
 
   const { data: lockEpisode } = await supabase
@@ -52,7 +59,7 @@ export async function saveDraft(leagueId: string, formData: FormData) {
 
   if (lockEpisode && new Date(lockEpisode.air_date) <= new Date()) return // locked
 
-  const contestantIds = formData.getAll('contestantId') as string[]
+  const contestantIds = capPicks(formData.getAll('contestantId') as string[], league.max_picks)
 
   await supabase.from('draft_picks').delete().eq('league_id', leagueId).eq('user_id', user.id)
   if (contestantIds.length > 0) {

@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { scoreWeeklyLineup } from '@/lib/scoring/weekly-team'
+import { effectivePoints, readOverrides } from '@/lib/scoring/league-rules'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,7 +14,7 @@ export default async function LeagueDraftOverviewPage({
 
   const { data: league } = await supabase
     .from('leagues')
-    .select('name, season_id, join_code')
+    .select('name, season_id, join_code, scoring_overrides')
     .eq('id', leagueId)
     .single()
 
@@ -36,12 +37,12 @@ export default async function LeagueDraftOverviewPage({
 
   const { data: allSeasonEvents } = await supabase
     .from('contestant_episode_events')
-    .select('contestant_id, points, episodes!inner(season_id)')
+    .select('contestant_id, points, event_code, episodes!inner(season_id)')
     .eq('episodes.season_id', league!.season_id)
 
   const seasonEventPoints = (allSeasonEvents ?? []).map((e) => ({
     contestantId: e.contestant_id,
-    points: e.points,
+    points: effectivePoints(e.event_code, e.points, readOverrides(league?.scoring_overrides)),
   }))
 
   const { data: draftPicks } = await supabase
