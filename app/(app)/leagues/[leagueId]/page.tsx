@@ -296,7 +296,12 @@ export default async function LeaguePage({
                 ? `⏰ Draft locks ${new Date(league.draft_locks_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York', timeZoneName: 'short' })}`
                 : `⏰ Locks when Episode 2 airs${draftLockEpisode ? ` (${formatAirDate(draftLockEpisode.air_date)})` : ''}`}
             </p>
-            <TeamPicker contestants={contestants ?? []} initialSelectedIds={Array.from(myPickIds)} maxPicks={maxPicks} />
+            <TeamPicker
+              contestants={contestants ?? []}
+              initialSelectedIds={Array.from(myPickIds)}
+              maxPicks={maxPicks}
+              takenIds={(allDraftPicks ?? []).filter((p) => p.user_id !== user!.id).map((p) => p.contestant_id)}
+            />
             <button
               type="submit"
               className="w-fit rounded bg-fuchsia-600 px-4 py-2 text-sm font-semibold text-white"

@@ -111,7 +111,14 @@ export async function saveDraft(leagueId: string, formData: FormData) {
         contestantIds.map((contestantId) => ({ league_id: leagueId, user_id: user.id, contestant_id: contestantId })),
         { onConflict: 'league_id,user_id,contestant_id' }
       )
-    if (error) failSave(leagueId, error.message)
+    if (error) {
+      failSave(
+        leagueId,
+        error.code === '23505'
+          ? 'One of those bakers was already drafted by another team. Refresh and pick someone else.'
+          : error.message
+      )
+    }
   }
 
   let cleanup = supabase.from('draft_picks').delete().eq('league_id', leagueId).eq('user_id', user.id)

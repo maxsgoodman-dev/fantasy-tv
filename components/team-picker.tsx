@@ -32,10 +32,13 @@ export function TeamPicker({
   contestants,
   initialSelectedIds,
   maxPicks = null,
+  takenIds = [],
 }: {
   contestants: Contestant[]
   initialSelectedIds: string[]
   maxPicks?: number | null
+  /** Contestants already drafted by another team (each can only be on one team). */
+  takenIds?: string[]
 }) {
   const [selectedIds, setSelectedIds] = useState<string[]>(
     maxPicks ? initialSelectedIds.slice(0, maxPicks) : initialSelectedIds
@@ -59,7 +62,8 @@ export function TeamPicker({
       <div className="flex flex-1 flex-wrap gap-3">
         {contestants.map((c) => {
           const isSelected = selectedIds.includes(c.id)
-          const blocked = atLimit && !isSelected
+          const taken = takenIds.includes(c.id) && !isSelected
+          const blocked = (atLimit && !isSelected) || taken
           return (
             <button
               key={c.id}
@@ -67,13 +71,14 @@ export function TeamPicker({
               onClick={() => toggle(c.id)}
               aria-pressed={isSelected}
               disabled={blocked}
-              title={blocked ? `Limit of ${maxPicks} picks reached \u2014 remove one first` : undefined}
+              title={taken ? 'Already on another team' : blocked ? `Limit of ${maxPicks} picks reached \u2014 remove one first` : undefined}
               className={`flex flex-col items-center gap-1 rounded-lg border-2 p-2 text-sm sm:text-base ${
                 isSelected ? 'border-fuchsia-600 bg-fuchsia-50' : 'border-transparent'
               } ${blocked ? 'cursor-not-allowed opacity-40' : ''}`}
             >
               <ContestantPhoto url={c.photo_url} name={c.name} />
               <span>{c.name}</span>
+              {taken && <span className="text-xs font-semibold text-zinc-500">Taken</span>}
               {isSelected && <input type="hidden" name="contestantId" value={c.id} />}
             </button>
           )
