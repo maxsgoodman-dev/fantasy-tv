@@ -25,3 +25,10 @@ export function wikiChangesEmail(showName: string, eventCount: number) {
     text: `The show wiki changed and ${eventCount} suggested scoring event${eventCount === 1 ? '' : 's'} ${eventCount === 1 ? 'is' : 'are'} waiting for review at /admin/wiki-sources.`,
   }
 }
+
+export function leagueInviteEmail(opts: { inviterName: string; leagueName: string; showName: string; link: string; code: string }) {
+  return {
+    subject: `${opts.inviterName} invited you to ${opts.leagueName} on Fantasy TV`,
+    text: `${opts.inviterName} invited you to join "${opts.leagueName}" (${opts.showName}) on Fantasy TV.\n\nJoin here: ${opts.link}\n\nYou'll create a quick account with a username, email and password. Your league join code is ${opts.code} if you're asked for it.`,
+  }
+}

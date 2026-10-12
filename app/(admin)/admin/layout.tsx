@@ -17,6 +17,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         <a href="/admin/leagues/new" className="font-medium text-zinc-700 hover:text-fuchsia-700">
           + New League
         </a>
+        <a href="/admin/invites" className="font-medium text-zinc-700 hover:text-fuchsia-700">
+          User Invites
+        </a>
         <a href="/admin/wiki-sources" className="font-medium text-zinc-700 hover:text-fuchsia-700">
           Wiki Sources
         </a>
