@@ -49,7 +49,7 @@ export default async function LeaguePage({
 
   const { data: league } = await supabase
     .from('leagues')
-    .select('name, format, season_id, max_picks, join_code, scoring_overrides, seasons(shows(id, name))')
+    .select('name, format, season_id, max_picks, join_code, draft_locks_at, scoring_overrides, seasons(shows(id, name))')
     .eq('id', leagueId)
     .single()
 
@@ -194,7 +194,8 @@ export default async function LeaguePage({
   // kind of stackable per-episode event log as the weekly-team format —
   // just summed across the whole season instead of one episode at a time.
   const draftLockEpisode = episodes?.find((e) => e.episode_number === 2)
-  const draftLocked = draftLockEpisode ? draftLockEpisode.air_date <= new Date().toISOString() : false
+  const draftLockAt = league?.draft_locks_at ?? draftLockEpisode?.air_date ?? null
+  const draftLocked = draftLockAt ? draftLockAt <= new Date().toISOString() : false
 
   const { data: myDraft } = await supabase
     .from('draft_picks')
@@ -291,8 +292,9 @@ export default async function LeaguePage({
               Pick your team for the season. You can change your picks any time before the draft locks.
             </p>
             <p className="inline-flex w-fit items-center gap-1 rounded-full bg-amber-100 px-2 py-1 text-xs font-bold text-amber-800">
-              ⏰ Locks when Episode 2 airs
-              {draftLockEpisode ? ` (${formatAirDate(draftLockEpisode.air_date)})` : ''}
+              {league?.draft_locks_at
+                ? `⏰ Draft locks ${new Date(league.draft_locks_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York', timeZoneName: 'short' })}`
+                : `⏰ Locks when Episode 2 airs${draftLockEpisode ? ` (${formatAirDate(draftLockEpisode.air_date)})` : ''}`}
             </p>
             <TeamPicker contestants={contestants ?? []} initialSelectedIds={Array.from(myPickIds)} maxPicks={maxPicks} />
             <button

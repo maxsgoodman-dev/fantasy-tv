@@ -11,12 +11,15 @@ export default async function LeagueSettingsPage({ params }: { params: Promise<{
 
   const { data: league } = await supabase
     .from('leagues')
-    .select('name, format, max_picks, scoring_overrides, seasons(shows(name))')
+    .select('name, format, max_picks, draft_locks_at, scoring_overrides, seasons(shows(name))')
     .eq('id', leagueId)
     .single()
 
   const showName = (league?.seasons as unknown as { shows: { name: string } } | null)?.shows?.name
   const rules = effectiveRules(rulesetForShowName(showName), readOverrides(league?.scoring_overrides))
+  const lockLocal = league?.draft_locks_at
+    ? new Date(league.draft_locks_at).toLocaleString('sv-SE', { timeZone: 'America/New_York' }).slice(0, 16).replace(' ', 'T')
+    : ''
   const categories = Array.from(new Set(rules.map((r) => r.category)))
 
   return (
@@ -42,6 +45,16 @@ export default async function LeagueSettingsPage({ params }: { params: Promise<{
             className="w-32 rounded border p-2"
           />
         </section>
+
+        {league?.format === 'bracket' && (
+          <section className="card flex flex-col gap-2 p-4">
+            <h2 className="text-xl font-bold">Draft deadline</h2>
+            <p className="text-sm text-zinc-600">
+              When picks lock (US Eastern time). Leave blank to lock when Episode 2 airs.
+            </p>
+            <input name="draftLocksAt" type="datetime-local" defaultValue={lockLocal} className="w-60 rounded border p-2" />
+          </section>
+        )}
 
         <section className="card flex flex-col gap-4 p-4">
           <h2 className="text-xl font-bold">Scoring modifiers</h2>

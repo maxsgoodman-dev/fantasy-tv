@@ -24,9 +24,20 @@ export async function saveLeagueSettings(leagueId: string, formData: FormData) {
   const rawMax = String(formData.get('maxPicks') ?? '').trim()
   const maxPicks = rawMax === '' ? null : Math.max(1, Math.floor(Number(rawMax))) || null
 
+  // datetime-local has no timezone; interpret it as US Eastern.
+  const rawLock = String(formData.get('draftLocksAt') ?? '').trim()
+  let draftLocksAt: string | null = null
+  if (rawLock) {
+    const asUtc = new Date(`${rawLock}:00Z`)
+    if (!Number.isNaN(asUtc.getTime())) {
+      const east = new Date(asUtc.toLocaleString('en-US', { timeZone: 'America/New_York' }) + ' UTC')
+      draftLocksAt = new Date(asUtc.getTime() + (asUtc.getTime() - east.getTime())).toISOString()
+    }
+  }
+
   await supabase
     .from('leagues')
-    .update({ max_picks: maxPicks, scoring_overrides: buildOverrides(rules, submitted) })
+    .update({ max_picks: maxPicks, draft_locks_at: draftLocksAt, scoring_overrides: buildOverrides(rules, submitted) })
     .eq('id', leagueId)
 
   revalidatePath(`/admin/leagues/${leagueId}/settings`)

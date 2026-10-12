@@ -80,7 +80,11 @@ export async function saveDraft(leagueId: string, formData: FormData) {
   } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: league } = await supabase.from('leagues').select('season_id, max_picks').eq('id', leagueId).single()
+  const { data: league } = await supabase
+    .from('leagues')
+    .select('season_id, max_picks, draft_locks_at')
+    .eq('id', leagueId)
+    .single()
   if (!league) failSave(leagueId, 'League not found.')
 
   const { data: lockEpisode } = await supabase
@@ -90,7 +94,8 @@ export async function saveDraft(leagueId: string, formData: FormData) {
     .eq('episode_number', 2)
     .maybeSingle()
 
-  if (lockEpisode && new Date(lockEpisode.air_date) <= new Date()) failSave(leagueId, 'The draft is locked.')
+  const lockAt = league.draft_locks_at ?? lockEpisode?.air_date ?? null
+  if (lockAt && new Date(lockAt) <= new Date()) failSave(leagueId, 'The draft is locked.')
 
   const contestantIds = await onlySeasonContestants(
     supabase,
