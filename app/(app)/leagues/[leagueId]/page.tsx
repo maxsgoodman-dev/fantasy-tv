@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { saveLineup, saveDraft } from './actions'
 import { Avatar } from '@/components/avatar'
 import { TeamPicker } from '@/components/team-picker'
+import { ShareLeague } from '@/components/share-league'
 import { ContestantBios } from '@/components/contestant-bios'
 import { ScoringGuide } from '@/components/scoring-guide'
 import { scoreWeeklyLineup } from '@/lib/scoring/weekly-team'
@@ -32,8 +33,15 @@ function formatAirDate(iso: string) {
   })
 }
 
-export default async function LeaguePage({ params }: { params: Promise<{ leagueId: string }> }) {
+export default async function LeaguePage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ leagueId: string }>
+  searchParams: Promise<{ saveError?: string }>
+}) {
   const { leagueId } = await params
+  const { saveError } = await searchParams
   const supabase = await createClient()
   const {
     data: { user },
@@ -41,7 +49,7 @@ export default async function LeaguePage({ params }: { params: Promise<{ leagueI
 
   const { data: league } = await supabase
     .from('leagues')
-    .select('name, format, season_id, max_picks, scoring_overrides, seasons(shows(id, name))')
+    .select('name, format, season_id, max_picks, join_code, scoring_overrides, seasons(shows(id, name))')
     .eq('id', leagueId)
     .single()
 
@@ -128,6 +136,13 @@ export default async function LeaguePage({ params }: { params: Promise<{ leagueI
             </a>
           )}
         </div>
+
+        {league?.join_code && <ShareLeague leagueName={league.name} joinCode={league.join_code} />}
+        {saveError && (
+          <p role="alert" className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+            Your picks weren&apos;t saved: {saveError}
+          </p>
+        )}
 
         <ContestantBios contestants={contestants ?? []} />
 
@@ -232,6 +247,13 @@ export default async function LeaguePage({ params }: { params: Promise<{ leagueI
           </a>
         )}
       </div>
+
+      {league?.join_code && <ShareLeague leagueName={league.name} joinCode={league.join_code} />}
+      {saveError && (
+        <p role="alert" className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+          Your picks weren&apos;t saved: {saveError}
+        </p>
+      )}
 
       <ContestantBios contestants={contestants ?? []} />
 

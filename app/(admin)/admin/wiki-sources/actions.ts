@@ -76,10 +76,13 @@ export async function approveWikiEvent(ingestionId: string, eventIndex: number, 
 
   const { data: ingestion } = await supabase
     .from('wiki_ingestions')
-    .select('suggested_events')
+    .select('suggested_events, reviewed')
     .eq('id', ingestionId)
     .single()
   if (!ingestion) return
+
+  // Already approved or dismissed (double click, second tab): posting again would double-count.
+  if ((ingestion.reviewed as Record<number, string> | null)?.[eventIndex] !== undefined) return
 
   const event = (ingestion.suggested_events as SuggestedEvent[])[eventIndex]
   if (!event) return

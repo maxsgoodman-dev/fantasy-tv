@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import { joinPendingLeague } from '@/lib/auth/join-pending'
 import { type NextRequest } from 'next/server'
 import type { EmailOtpType } from '@supabase/supabase-js'
 
@@ -12,7 +13,8 @@ export async function GET(request: NextRequest) {
     const supabase = await createClient()
     const { error } = await supabase.auth.verifyOtp({ type, token_hash })
     if (!error) {
-      redirect('/dashboard')
+      const leagueId = await joinPendingLeague(supabase)
+      redirect(leagueId ? `/welcome?league=${leagueId}` : '/dashboard')
     }
   }
 

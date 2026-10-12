@@ -3,7 +3,7 @@
 import { requireAdmin } from '@/lib/auth/require-admin'
 import { suggestEventsFromTranscript, ELIMINATED_CODE, type SuggestedEvent } from '@/lib/ai/parse-transcript'
 import { rulesetForShowName, findRuleAcrossSets } from '@/lib/scoring/rulesets'
-import { postScoredEvent, markEliminated } from '@/lib/scoring/post-event'
+import { postScoredEvent, markEliminated, rollbackInserted, type InsertedRow } from '@/lib/scoring/post-event'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
@@ -68,40 +68,60 @@ export async function uploadTranscript(episodeId: string, formData: FormData) {
 
 export async function approveTranscriptUpload(episodeId: string, uploadId: string) {
   const { supabase, userId } = await requireAdmin()
+  const errorUrl = (message: string) =>
+    `/admin/episodes/${episodeId}/transcript?error=${encodeURIComponent(message.slice(0, 300))}`
 
-  const { data: upload } = await supabase
-    .from('transcript_uploads')
-    .select('suggested_events')
-    .eq('id', uploadId)
-    .single()
-
-  const { contestants } = await loadEpisodeContext(supabase, episodeId)
-  const suggestedEvents = (upload!.suggested_events ?? []) as SuggestedEvent[]
-
-  for (const suggestion of suggestedEvents) {
-    const contestant = matchContestant(contestants, suggestion.contestantName)
-    if (!contestant) continue
-
-    if (suggestion.eventCode === ELIMINATED_CODE) {
-      await markEliminated(supabase, episodeId, contestant.id, suggestion.description)
-      continue
-    }
-
-    const rule = findRuleAcrossSets(suggestion.eventCode)
-    if (!rule) continue
-
-    await postScoredEvent(supabase, {
-      episodeId,
-      contestantId: contestant.id,
-      rule,
-      label: suggestion.description,
-    })
-  }
-
-  await supabase
+  // Claim the upload atomically (pending -> approved) BEFORE posting anything. A double
+  // click, a second tab or a retry then finds nothing to claim instead of re-posting
+  // every event and double-counting the points.
+  const { data: claimed } = await supabase
     .from('transcript_uploads')
     .update({ status: 'approved', reviewed_by: userId })
     .eq('id', uploadId)
+    .eq('status', 'pending')
+    .select('suggested_events')
+  if (!claimed || claimed.length === 0) {
+    redirect(errorUrl('This transcript was already approved, so nothing was posted again.'))
+  }
+
+  const { contestants } = await loadEpisodeContext(supabase, episodeId)
+  const suggestedEvents = (claimed[0].suggested_events ?? []) as SuggestedEvent[]
+
+  const inserted: InsertedRow[] = []
+  let failure: string | null = null
+  try {
+    for (const suggestion of suggestedEvents) {
+      const contestant = matchContestant(contestants, suggestion.contestantName)
+      if (!contestant) continue
+
+      if (suggestion.eventCode === ELIMINATED_CODE) {
+        const markerId = await markEliminated(supabase, episodeId, contestant.id, suggestion.description)
+        if (markerId) inserted.push({ table: 'episode_events', id: markerId })
+        continue
+      }
+
+      const rule = findRuleAcrossSets(suggestion.eventCode)
+      if (!rule) continue
+
+      inserted.push(
+        ...(await postScoredEvent(supabase, {
+          episodeId,
+          contestantId: contestant.id,
+          rule,
+          label: suggestion.description,
+        }))
+      )
+    }
+  } catch (err) {
+    failure = err instanceof Error ? err.message : String(err)
+  }
+
+  if (failure) {
+    // Undo what this run wrote and put the upload back to pending so it can be retried cleanly.
+    await rollbackInserted(supabase, inserted)
+    await supabase.from('transcript_uploads').update({ status: 'pending', reviewed_by: null }).eq('id', uploadId)
+    redirect(errorUrl(`Nothing was posted. ${failure}`))
+  }
 
   await supabase.from('episodes').update({ status: 'results_posted' }).eq('id', episodeId)
 

@@ -17,8 +17,8 @@ export type WikiSourceRow = {
  * and (if anything changed) queues the matched events for admin review.
  * Never writes to the scoring tables directly — see wiki-sources/actions.ts.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function checkSource(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: any,
   source: WikiSourceRow
 ): Promise<{ changed: boolean; eventCount: number }> {

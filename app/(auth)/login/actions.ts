@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import { joinPendingLeague } from '@/lib/auth/join-pending'
 
 export type LoginState = { error?: string }
 
@@ -14,5 +15,6 @@ export async function login(_prevState: LoginState, formData: FormData): Promise
   if (error) {
     return { error: error.message }
   }
-  redirect('/dashboard')
+  const leagueId = await joinPendingLeague(supabase)
+  redirect(leagueId ? `/welcome?league=${leagueId}` : '/dashboard')
 }
