@@ -33,12 +33,15 @@ export function TeamPicker({
   initialSelectedIds,
   maxPicks = null,
   takenIds = [],
+  eliminatedIds = [],
 }: {
   contestants: Contestant[]
   initialSelectedIds: string[]
   maxPicks?: number | null
   /** Contestants already drafted by another team (each can only be on one team). */
   takenIds?: string[]
+  /** Contestants already out of the show (can't earn points, so not draftable). */
+  eliminatedIds?: string[]
 }) {
   const [selectedIds, setSelectedIds] = useState<string[]>(
     maxPicks ? initialSelectedIds.slice(0, maxPicks) : initialSelectedIds
@@ -63,7 +66,8 @@ export function TeamPicker({
         {contestants.map((c) => {
           const isSelected = selectedIds.includes(c.id)
           const taken = takenIds.includes(c.id) && !isSelected
-          const blocked = (atLimit && !isSelected) || taken
+          const out = eliminatedIds.includes(c.id) && !isSelected
+          const blocked = (atLimit && !isSelected) || taken || out
           return (
             <button
               key={c.id}
@@ -71,7 +75,7 @@ export function TeamPicker({
               onClick={() => toggle(c.id)}
               aria-pressed={isSelected}
               disabled={blocked}
-              title={taken ? 'Already on another team' : blocked ? `Limit of ${maxPicks} picks reached \u2014 remove one first` : undefined}
+              title={out ? 'Eliminated from the show' : taken ? 'Already on another team' : blocked ? `Limit of ${maxPicks} picks reached \u2014 remove one first` : undefined}
               className={`flex flex-col items-center gap-1 rounded-lg border-2 p-2 text-sm sm:text-base ${
                 isSelected ? 'border-fuchsia-600 bg-fuchsia-50' : 'border-transparent'
               } ${blocked ? 'cursor-not-allowed opacity-40' : ''}`}
@@ -79,6 +83,7 @@ export function TeamPicker({
               <ContestantPhoto url={c.photo_url} name={c.name} />
               <span>{c.name}</span>
               {taken && <span className="text-xs font-semibold text-zinc-500">Taken</span>}
+              {out && <span className="text-xs font-semibold text-red-600">Out</span>}
               {isSelected && <input type="hidden" name="contestantId" value={c.id} />}
             </button>
           )

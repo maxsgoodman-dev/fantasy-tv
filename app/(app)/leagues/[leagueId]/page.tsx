@@ -301,6 +301,7 @@ export default async function LeaguePage({
               initialSelectedIds={Array.from(myPickIds)}
               maxPicks={maxPicks}
               takenIds={(allDraftPicks ?? []).filter((p) => p.user_id !== user!.id).map((p) => p.contestant_id)}
+              eliminatedIds={Array.from(eliminatedContestantIds)}
             />
             <button
               type="submit"
