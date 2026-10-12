@@ -12,7 +12,12 @@ import { DeleteButton } from '@/components/delete-button'
 
 export const dynamic = 'force-dynamic'
 
-export default async function ShowsPage() {
+export default async function ShowsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>
+}) {
+  const { error } = await searchParams
   const supabase = await createClient()
   const { data: shows } = await supabase
     .from('shows')
@@ -21,6 +26,11 @@ export default async function ShowsPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      {error && (
+        <p role="alert" className="rounded border border-red-600 bg-red-50 p-3 text-sm text-red-700">
+          {error}
+        </p>
+      )}
       <form action={createShow} className="flex gap-2">
         <input name="name" placeholder="Show name" required className="rounded border p-2" />
         <input name="description" placeholder="Description" className="rounded border p-2" />

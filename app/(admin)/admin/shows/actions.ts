@@ -2,6 +2,11 @@
 
 import { requireAdmin } from '@/lib/auth/require-admin'
 import { revalidatePath } from 'next/cache'
+import { redirect } from 'next/navigation'
+
+function failWith(message: string): never {
+  redirect(`/admin/shows?error=${encodeURIComponent(message.slice(0, 300))}`)
+}
 
 export async function createShow(formData: FormData) {
   const { supabase } = await requireAdmin()
@@ -35,8 +40,24 @@ export async function updateShow(showId: string, formData: FormData) {
 
 export async function deleteShow(showId: string) {
   const { supabase } = await requireAdmin()
-  await supabase.from('shows').delete().eq('id', showId)
+
+  // leagues.season_id has no ON DELETE CASCADE, so a show whose seasons still have
+  // leagues cannot be deleted directly. Remove those leagues first (their members,
+  // picks, lineups and brackets cascade from the leagues).
+  const { data: seasons, error: seasonsError } = await supabase.from('seasons').select('id').eq('show_id', showId)
+  if (seasonsError) failWith(`Could not load seasons: ${seasonsError.message}`)
+  const seasonIds = (seasons ?? []).map((s) => s.id)
+  if (seasonIds.length > 0) {
+    const { error: leaguesError } = await supabase.from('leagues').delete().in('season_id', seasonIds)
+    if (leaguesError) failWith(`Could not delete the show's leagues: ${leaguesError.message}`)
+  }
+
+  const { data: deleted, error } = await supabase.from('shows').delete().eq('id', showId).select('id')
+  if (error) failWith(`Could not delete show: ${error.message}`)
+  if (!deleted || deleted.length === 0) failWith('Show was not deleted (not found, or you lack permission).')
+
   revalidatePath('/admin/shows')
+  revalidatePath('/dashboard')
 }
 
 export async function updateSeason(seasonId: string, formData: FormData) {
@@ -50,8 +71,17 @@ export async function updateSeason(seasonId: string, formData: FormData) {
 
 export async function deleteSeason(seasonId: string) {
   const { supabase } = await requireAdmin()
-  await supabase.from('seasons').delete().eq('id', seasonId)
+
+  // Same FK gap as deleteShow: clear the season's leagues first.
+  const { error: leaguesError } = await supabase.from('leagues').delete().eq('season_id', seasonId)
+  if (leaguesError) failWith(`Could not delete the season's leagues: ${leaguesError.message}`)
+
+  const { data: deleted, error } = await supabase.from('seasons').delete().eq('id', seasonId).select('id')
+  if (error) failWith(`Could not delete season: ${error.message}`)
+  if (!deleted || deleted.length === 0) failWith('Season was not deleted (not found, or you lack permission).')
+
   revalidatePath('/admin/shows')
+  revalidatePath('/dashboard')
 }
 
 export async function uploadShowImage(showId: string, formData: FormData) {
