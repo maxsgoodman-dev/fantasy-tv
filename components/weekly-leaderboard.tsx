@@ -1,9 +1,11 @@
 import { Avatar } from '@/components/avatar'
 
 export type WeeklyPlayer = {
-  userId: string
+  id: string
   name: string
   avatarUrl: string | null
+  /** e.g. the people on a shared team */
+  subtitle?: string
   /** episode number -> { points, picks }, or undefined when the player had no lineup that week */
   perEpisode: Record<number, { points: number; picks: string[] } | undefined>
 }
@@ -33,12 +35,13 @@ export function WeeklyLeaderboard({
   players,
   contestants,
   episodeNumbers,
-  currentUserId,
+  myId,
 }: {
   players: WeeklyPlayer[]
   contestants: WeeklyContestant[]
   episodeNumbers: number[]
-  currentUserId: string
+  /** the signed-in user's player/team id, to highlight their row */
+  myId: string | null
 }) {
   const totalOf = (p: WeeklyPlayer) => sum(Object.values(p.perEpisode).map((v) => v?.points))
   const ranked = [...players].sort((a, b) => totalOf(b) - totalOf(a) || a.name.localeCompare(b.name))
@@ -56,10 +59,10 @@ export function WeeklyLeaderboard({
         <h2 className="text-xl font-bold">Standings</h2>
         <ol className="mt-3 flex flex-col gap-2">
           {ranked.map((p, i) => {
-            const mine = p.userId === currentUserId
+            const mine = p.id === myId
             return (
               <li
-                key={p.userId}
+                key={p.id}
                 className={`flex items-center gap-3 rounded-lg border p-3 ${
                   mine ? 'border-fuchsia-500/40 bg-fuchsia-500/10 ring-2 ring-fuchsia-600 dark:ring-fuchsia-400' : 'border-zinc-500/30 bg-zinc-500/5'
                 }`}
@@ -67,10 +70,13 @@ export function WeeklyLeaderboard({
                 <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-zinc-700 text-sm font-bold text-white">
                   {i + 1}
                 </span>
-                <Avatar url={p.avatarUrl} name={p.name} size={28} />
-                <div className="min-w-0 flex-1 truncate font-bold">
-                  {p.name}
-                  {mine && <span className="ml-2 text-xs font-semibold text-fuchsia-700 dark:text-fuchsia-300">(you)</span>}
+                {p.avatarUrl !== null && <Avatar url={p.avatarUrl} name={p.name} size={28} />}
+                <div className="min-w-0 flex-1">
+                  <div className="truncate font-bold">
+                    {p.name}
+                    {mine && <span className="ml-2 text-xs font-semibold text-fuchsia-700 dark:text-fuchsia-300">(you)</span>}
+                  </div>
+                  {p.subtitle && <div className="truncate text-xs text-zinc-600">{p.subtitle}</div>}
                 </div>
                 <div className="text-right">
                   <div className="text-2xl font-extrabold leading-none">{totalOf(p)}</div>
@@ -104,7 +110,7 @@ export function WeeklyLeaderboard({
               </thead>
               <tbody>
                 {ranked.map((p) => (
-                  <tr key={p.userId} className={`border-b border-zinc-100 align-top ${p.userId === currentUserId ? 'bg-fuchsia-500/10' : ''}`}>
+                  <tr key={p.id} className={`border-b border-zinc-100 align-top ${p.id === myId ? 'bg-fuchsia-500/10' : ''}`}>
                     <td className="py-2 pr-3 font-semibold">{p.name}</td>
                     <td className="py-2 pr-3 text-right font-bold">{totalOf(p)}</td>
                     {episodeNumbers.map((n) => {

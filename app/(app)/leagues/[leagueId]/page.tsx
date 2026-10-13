@@ -93,17 +93,24 @@ export default async function LeaguePage({
     const now = new Date().toISOString()
     const upcomingEpisodes = (episodes ?? []).filter((e) => e.air_date > now)
 
-    const { data: myLineups } = await supabase
-      .from('weekly_lineups')
-      .select('id, episode_id, weekly_lineup_picks(contestant_id)')
+    // Teams: several people can share one weekly team (and its login-per-person access).
+    const { data: weeklyTeams } = await supabase
+      .from('league_teams')
+      .select('id, name, draft_spot')
       .eq('league_id', leagueId)
-      .eq('user_id', user!.id)
+      .order('name')
+    const weeklyTeamMode = (weeklyTeams ?? []).length > 0
+    const myWeeklyTeamId: string | null =
+      ((members ?? []).find((m) => m.user_id === user!.id)?.team_id as string | null | undefined) ?? null
 
-    // Everything needed to compute every member's total score.
+    // Everything needed to compute every player's score (picks are visible to the whole league).
     const { data: allLineups } = await supabase
       .from('weekly_lineups')
-      .select('user_id, episode_id, weekly_lineup_picks(contestant_id)')
+      .select('user_id, team_id, episode_id, weekly_lineup_picks(contestant_id)')
       .eq('league_id', leagueId)
+    const myLineups = (allLineups ?? []).filter((l) =>
+      weeklyTeamMode && myWeeklyTeamId ? l.team_id === myWeeklyTeamId : l.team_id === null && l.user_id === user!.id
+    )
 
     const { data: allEvents } = await supabase
       .from('contestant_episode_events')
@@ -134,10 +141,9 @@ export default async function LeaguePage({
       if (n !== undefined) eliminatedEp.set(ev.contestant_id, n)
     }
 
-    const weeklyPlayers: WeeklyPlayer[] = (members ?? []).map((m) => {
-      const profile = m.profiles as unknown as { display_name: string; avatar_url: string | null } | null
+    const buildPerEpisode = (lineups: NonNullable<typeof allLineups>) => {
       const perEpisode: WeeklyPlayer['perEpisode'] = {}
-      for (const lineup of (allLineups ?? []).filter((l) => l.user_id === m.user_id)) {
+      for (const lineup of lineups) {
         const n = epNumberById.get(lineup.episode_id)
         if (n === undefined) continue
         const picks = (lineup.weekly_lineup_picks as unknown as { contestant_id: string }[]).map((p) => ({
@@ -151,13 +157,29 @@ export default async function LeaguePage({
           picks: picks.map((p) => contestantNameById.get(p.contestantId) ?? '?'),
         }
       }
-      return {
-        userId: m.user_id,
-        name: m.display_name ?? profile?.display_name ?? 'Member',
-        avatarUrl: m.avatar_url ?? profile?.avatar_url ?? null,
-        perEpisode,
-      }
-    })
+      return perEpisode
+    }
+    const memberName = (m: { display_name: string | null; profiles: unknown }) => {
+      const profile = m.profiles as unknown as { display_name: string } | null
+      return m.display_name ?? profile?.display_name ?? 'Member'
+    }
+    const weeklyPlayers: WeeklyPlayer[] = weeklyTeamMode
+      ? (weeklyTeams ?? []).map((t) => ({
+          id: t.id,
+          name: t.name,
+          avatarUrl: null,
+          subtitle: (members ?? []).filter((m) => m.team_id === t.id).map(memberName).join(', ') || undefined,
+          perEpisode: buildPerEpisode((allLineups ?? []).filter((l) => l.team_id === t.id)),
+        }))
+      : (members ?? []).map((m) => {
+          const profile = m.profiles as unknown as { avatar_url: string | null } | null
+          return {
+            id: m.user_id,
+            name: memberName(m),
+            avatarUrl: m.avatar_url ?? profile?.avatar_url ?? null,
+            perEpisode: buildPerEpisode((allLineups ?? []).filter((l) => l.team_id === null && l.user_id === m.user_id)),
+          }
+        })
     const weeklyContestants: WeeklyContestant[] = (contestants ?? []).map((c) => {
       const elimEp = eliminatedEp.get(c.id) ?? null
       const perEpisode: Record<number, number | null> = {}
@@ -192,7 +214,7 @@ export default async function LeaguePage({
           players={weeklyPlayers}
           contestants={weeklyContestants}
           episodeNumbers={shownEpisodeNumbers}
-          currentUserId={user!.id}
+          myId={weeklyTeamMode ? myWeeklyTeamId : user!.id}
         />
 
         <ContestantBios contestants={contestants ?? []} />
@@ -200,15 +222,20 @@ export default async function LeaguePage({
         {guide}
 
         <section className="flex flex-col gap-4">
-          <h2 className="text-xl font-bold">Set your weekly team</h2>
+          <h2 className="text-xl font-bold">{weeklyTeamMode ? 'Set your team’s weekly picks' : 'Set your weekly team'}</h2>
           <p className="text-sm text-zinc-600">
             Pick your team for each upcoming episode. Picks lock when that episode airs — you can change
             your team any time before then, and it can be different every week.
           </p>
+          {weeklyTeamMode && !myWeeklyTeamId && (
+            <p className="card p-4 text-sm text-zinc-600">
+              You&apos;re in this league but not on a team yet. Ask the league organizer to add your email to your team.
+            </p>
+          )}
           {upcomingEpisodes.length === 0 && (
             <p className="text-zinc-600">No upcoming episodes open for picks right now.</p>
           )}
-          {upcomingEpisodes.map((ep) => {
+          {(weeklyTeamMode && !myWeeklyTeamId ? [] : upcomingEpisodes).map((ep) => {
             const myLineup = myLineups?.find((l) => l.episode_id === ep.id)
             const myPickIds = new Set(
               ((myLineup?.weekly_lineup_picks as unknown as { contestant_id: string }[]) ?? []).map(

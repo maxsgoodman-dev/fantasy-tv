@@ -46,6 +46,26 @@ export async function saveLineup(leagueId: string, episodeId: string, formData: 
     capPicks(formData.getAll('contestantId') as string[], league.max_picks)
   )
 
+  // Members of a team share one lineup per episode; the database function checks membership,
+  // the lock and the pick limit and lets any teammate edit it.
+  const { data: membership } = await supabase
+    .from('league_members')
+    .select('team_id')
+    .eq('league_id', leagueId)
+    .eq('user_id', user.id)
+    .maybeSingle()
+  if (membership?.team_id) {
+    const { data: message, error } = await supabase.rpc('save_team_lineup', {
+      p_league_id: leagueId,
+      p_episode_id: episodeId,
+      p_contestant_ids: contestantIds,
+    })
+    if (error) failSave(leagueId, error.message)
+    if (message) failSave(leagueId, String(message))
+    revalidatePath(`/leagues/${leagueId}`)
+    return
+  }
+
   const { data: lineup, error: lineupError } = await supabase
     .from('weekly_lineups')
     .upsert({ league_id: leagueId, user_id: user.id, episode_id: episodeId }, { onConflict: 'league_id,user_id,episode_id' })

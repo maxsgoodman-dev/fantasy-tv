@@ -53,15 +53,10 @@ export default async function LeagueTeamsPage({
       <div>
         <h1 className="text-2xl font-bold">Teams — {league.name}</h1>
         <p className="text-sm text-zinc-600">
-          Join code <span className="font-mono">{league.join_code}</span>. Everyone on a team shares one set of bakers and one
+          Join code <span className="font-mono">{league.join_code}</span>. Everyone on a team shares one set of picks and one
           line on the leaderboard. Add each person&apos;s email: when they sign up (or sign in) with that email and join with the code,
           they land on the right team automatically.
         </p>
-        {league.format !== 'bracket' && (
-          <p className="mt-2 rounded border border-amber-400 bg-amber-50 p-2 text-sm text-amber-800">
-            Teams are built for season-draft leagues. This league is a weekly-team league, so team grouping won&apos;t show on its page.
-          </p>
-        )}
       </div>
 
       {error && (
@@ -153,6 +148,7 @@ export default async function LeagueTeamsPage({
               </form>
             </div>
 
+            {league.format === 'bracket' && (
             <form action={setTeamPicks.bind(null, leagueId, t.id)} className="flex flex-col gap-2">
               <h3 className="text-sm font-bold uppercase tracking-wide text-zinc-500">
                 Bakers{league.max_picks ? ` (max ${league.max_picks})` : ''}
@@ -174,6 +170,7 @@ export default async function LeagueTeamsPage({
                 Save bakers
               </button>
             </form>
+            )}
           </section>
         )
       })}
