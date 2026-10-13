@@ -17,16 +17,16 @@ export type LeaderboardBaker = {
 
 // One accent per draft spot (full class names so Tailwind can see them).
 const ACCENTS = [
-  { chip: 'bg-teal-600', soft: 'bg-teal-50', text: 'text-teal-800', border: 'border-teal-300' },
-  { chip: 'bg-rose-600', soft: 'bg-rose-50', text: 'text-rose-800', border: 'border-rose-300' },
-  { chip: 'bg-fuchsia-700', soft: 'bg-fuchsia-50', text: 'text-fuchsia-800', border: 'border-fuchsia-300' },
-  { chip: 'bg-amber-600', soft: 'bg-amber-50', text: 'text-amber-800', border: 'border-amber-300' },
+  { chip: 'bg-teal-700', soft: 'bg-teal-500/10', text: 'text-teal-800 dark:text-teal-300', border: 'border-teal-500/40' },
+  { chip: 'bg-rose-700', soft: 'bg-rose-500/10', text: 'text-rose-800 dark:text-rose-300', border: 'border-rose-500/40' },
+  { chip: 'bg-fuchsia-700', soft: 'bg-fuchsia-500/10', text: 'text-fuchsia-800 dark:text-fuchsia-300', border: 'border-fuchsia-500/40' },
+  { chip: 'bg-amber-700', soft: 'bg-amber-500/10', text: 'text-amber-800 dark:text-amber-300', border: 'border-amber-500/40' },
 ]
 const accentFor = (i: number) => ACCENTS[i % ACCENTS.length]
 
 function Cell({ value, out }: { value: number | null | 'X'; out?: boolean }) {
-  if (value === 'X') return <span className="font-bold text-red-600">X</span>
-  if (value === null) return <span className="text-zinc-300">--</span>
+  if (value === 'X') return <span className="font-bold text-red-600 dark:text-red-400">X</span>
+  if (value === null) return <span className="text-zinc-400">--</span>
   return <span className={out ? 'text-zinc-400' : value > 0 ? 'font-semibold' : 'text-zinc-500'}>{value}</span>
 }
 
@@ -77,7 +77,7 @@ export function DraftLeaderboard({
               <li
                 key={s.team.id}
                 className={`flex items-center gap-3 rounded-lg border p-3 ${a.soft} ${a.border} ${
-                  s.team.id === myTeamId ? 'ring-2 ring-fuchsia-500' : ''
+                  s.team.id === myTeamId ? 'ring-2 ring-fuchsia-600 dark:ring-fuchsia-400' : ''
                 }`}
               >
                 <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white ${a.chip}`}>
@@ -86,7 +86,7 @@ export function DraftLeaderboard({
                 <div className="min-w-0 flex-1">
                   <div className={`truncate font-bold ${a.text}`}>
                     {s.team.name}
-                    {s.team.id === myTeamId && <span className="ml-2 text-xs font-semibold text-fuchsia-700">(your team)</span>}
+                    {s.team.id === myTeamId && <span className="ml-2 text-xs font-semibold text-fuchsia-700 dark:text-fuchsia-300">(your team)</span>}
                   </div>
                   <div className="truncate text-xs text-zinc-600">
                     {s.alive} of {s.count} bakers still in
@@ -95,7 +95,7 @@ export function DraftLeaderboard({
                 </div>
                 <div className="text-right">
                   <div className="text-2xl font-extrabold leading-none">{s.total}</div>
-                  <div className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">points</div>
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-zinc-600">points</div>
                 </div>
               </li>
             )
@@ -106,7 +106,7 @@ export function DraftLeaderboard({
       <section className="card p-4">
         <h2 className="text-xl font-bold">Draft results</h2>
         <p className="text-sm text-zinc-600">
-          Every drafted baker, their team, and points by episode. <span className="font-bold text-red-600">X</span> = eliminated
+          Every drafted baker, their team, and points by episode. <span className="font-bold text-red-600 dark:text-red-400">X</span> = eliminated
           that episode, <span className="text-zinc-400">--</span> = no points (not scored yet, or already out).
         </p>
         <div className="mt-3 overflow-x-auto">
@@ -129,8 +129,8 @@ export function DraftLeaderboard({
                 const a = accentFor(teamIndex.get(b.teamId) ?? 0)
                 const out = b.eliminatedEpisode !== null
                 return (
-                  <tr key={b.id} className={`border-b border-zinc-100 ${b.teamId === myTeamId ? 'bg-fuchsia-50/50' : ''}`}>
-                    <td className={`py-2 pr-3 font-semibold ${out ? 'text-zinc-400 line-through' : ''}`}>{b.name}</td>
+                  <tr key={b.id} className={`border-b border-zinc-100 ${b.teamId === myTeamId ? 'bg-fuchsia-500/10' : ''}`}>
+                    <td className={`py-2 pr-3 font-semibold ${out ? 'text-zinc-500 line-through' : ''}`}>{b.name}</td>
                     <td className="py-2 pr-3">
                       <span className={`inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold text-white ${a.chip}`}>
                         {t?.name ?? '—'}
