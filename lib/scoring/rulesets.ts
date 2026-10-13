@@ -7,8 +7,13 @@ import { BAKEOFF_RULES } from './bakeoff-rules'
  * their own rulebooks are added later, this should become a real per-show
  * setting instead.
  */
+export function isBakeoffShow(showName: string | null | undefined): boolean {
+  // Matches "Bake Off" and "Baking Show" (the US/Netflix title).
+  return !!showName && /\bbak(e|ing)\b/i.test(showName)
+}
+
 export function rulesetForShowName(showName: string | null | undefined): ScoringRule[] {
-  if (showName && /bake/i.test(showName)) return BAKEOFF_RULES
+  if (isBakeoffShow(showName)) return BAKEOFF_RULES
   return TRAITORS_RULES
 }
 

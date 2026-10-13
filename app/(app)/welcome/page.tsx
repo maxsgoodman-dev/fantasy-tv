@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { isBakeoffShow } from '@/lib/scoring/rulesets'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,7 +29,7 @@ export default async function WelcomePage({ searchParams }: { searchParams: Prom
       : { data: null }
   const myTeam = (teams ?? []).find((t) => t.id === membership?.team_id) ?? null
 
-  const noun = /bake/i.test(showName ?? '') ? 'bakers' : 'contestants'
+  const noun = isBakeoffShow(showName) ? 'bakers' : 'contestants'
   const picksPhrase = league?.max_picks ? `${league.max_picks} contestants` : 'your contestants'
   const shared = 'Everyone on your team shares the same picks and the same score.'
 
