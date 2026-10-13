@@ -1,8 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { saveLineup, saveDraft } from './actions'
-import { Avatar } from '@/components/avatar'
 import { TeamPicker } from '@/components/team-picker'
 import { ShareLeague } from '@/components/share-league'
+import { WeeklyLeaderboard, type WeeklyContestant, type WeeklyPlayer } from '@/components/weekly-leaderboard'
 import { DraftLeaderboard, type LeaderboardBaker, type LeaderboardTeam } from '@/components/draft-leaderboard'
 import { ContestantBios } from '@/components/contestant-bios'
 import { ScoringGuide } from '@/components/scoring-guide'
@@ -110,18 +110,61 @@ export default async function LeaguePage({
       .select('contestant_id, points, event_code, episode_id, episodes!inner(season_id)')
       .eq('episodes.season_id', league.season_id)
 
-    const standingsSource = (members ?? []).map((m) => {
-      const memberLineups = (allLineups ?? []).filter((l) => l.user_id === m.user_id)
-      const total = memberLineups.reduce((sum, lineup) => {
+    const { data: weeklyEliminations } = await supabase
+      .from('episode_events')
+      .select('contestant_id, episode_id')
+      .eq('event_type', 'eliminated')
+      .in('episode_id', (episodes ?? []).map((e) => e.id))
+
+    const epNumberById = new Map((episodes ?? []).map((e) => [e.id, e.episode_number]))
+    const contestantNameById = new Map((contestants ?? []).map((c) => [c.id, c.name]))
+    const scoredEpisodes = new Set<number>()
+    const pointsByContestantEp = new Map<string, number>()
+    for (const ev of allEvents ?? []) {
+      const n = epNumberById.get(ev.episode_id)
+      if (n === undefined) continue
+      scoredEpisodes.add(n)
+      const key = `${ev.contestant_id}:${n}`
+      pointsByContestantEp.set(key, (pointsByContestantEp.get(key) ?? 0) + effectivePoints(ev.event_code, ev.points, overrides))
+    }
+    const shownEpisodeNumbers = Array.from(scoredEpisodes).sort((x, y) => x - y)
+    const eliminatedEp = new Map<string, number>()
+    for (const ev of weeklyEliminations ?? []) {
+      const n = epNumberById.get(ev.episode_id)
+      if (n !== undefined) eliminatedEp.set(ev.contestant_id, n)
+    }
+
+    const weeklyPlayers: WeeklyPlayer[] = (members ?? []).map((m) => {
+      const profile = m.profiles as unknown as { display_name: string; avatar_url: string | null } | null
+      const perEpisode: WeeklyPlayer['perEpisode'] = {}
+      for (const lineup of (allLineups ?? []).filter((l) => l.user_id === m.user_id)) {
+        const n = epNumberById.get(lineup.episode_id)
+        if (n === undefined) continue
         const picks = (lineup.weekly_lineup_picks as unknown as { contestant_id: string }[]).map((p) => ({
           contestantId: p.contestant_id,
         }))
         const eventsForEpisode = (allEvents ?? [])
           .filter((e) => e.episode_id === lineup.episode_id)
           .map((e) => ({ contestantId: e.contestant_id, points: effectivePoints(e.event_code, e.points, overrides) }))
-        return sum + scoreWeeklyLineup(picks, eventsForEpisode)
-      }, 0)
-      return { user_id: m.user_id, points_awarded: total }
+        perEpisode[n] = {
+          points: scoreWeeklyLineup(picks, eventsForEpisode),
+          picks: picks.map((p) => contestantNameById.get(p.contestantId) ?? '?'),
+        }
+      }
+      return {
+        userId: m.user_id,
+        name: m.display_name ?? profile?.display_name ?? 'Member',
+        avatarUrl: m.avatar_url ?? profile?.avatar_url ?? null,
+        perEpisode,
+      }
+    })
+    const weeklyContestants: WeeklyContestant[] = (contestants ?? []).map((c) => {
+      const elimEp = eliminatedEp.get(c.id) ?? null
+      const perEpisode: Record<number, number | null> = {}
+      for (const n of shownEpisodeNumbers) {
+        perEpisode[n] = elimEp !== null && n > elimEp ? null : (pointsByContestantEp.get(`${c.id}:${n}`) ?? null)
+      }
+      return { id: c.id, name: c.name, eliminatedEpisode: elimEp, perEpisode }
     })
 
     return (
@@ -144,6 +187,13 @@ export default async function LeaguePage({
             Your picks weren&apos;t saved: {saveError}
           </p>
         )}
+
+        <WeeklyLeaderboard
+          players={weeklyPlayers}
+          contestants={weeklyContestants}
+          episodeNumbers={shownEpisodeNumbers}
+          currentUserId={user!.id}
+        />
 
         <ContestantBios contestants={contestants ?? []} />
 
@@ -186,7 +236,6 @@ export default async function LeaguePage({
         </section>
 
         <EpisodesSection episodes={episodes} />
-        <StandingsSection members={members} standingsSource={standingsSource} currentUserId={user!.id} />
       </div>
     )
   }
@@ -246,13 +295,6 @@ export default async function LeaguePage({
     points: effectivePoints(e.event_code, e.points, overrides),
   }))
 
-  const standingsSource = (members ?? []).map((m) => {
-    const picks = (allDraftPicks ?? [])
-      .filter((p) => p.team_id === null && p.user_id === m.user_id)
-      .map((p) => ({ contestantId: p.contestant_id }))
-    return { user_id: m.user_id, points_awarded: scoreWeeklyLineup(picks, seasonEventPoints) }
-  })
-
   // Team leaderboard data (spreadsheet-style: baker x episode, plus a team standings box).
   const epNumberById = new Map((episodes ?? []).map((e) => [e.id, e.episode_number]))
   const eliminatedEpByContestant = new Map<string, number>()
@@ -269,22 +311,32 @@ export default async function LeaguePage({
     const key = `${ev.contestant_id}:${n}`
     pointsByBakerEp.set(key, (pointsByBakerEp.get(key) ?? 0) + effectivePoints(ev.event_code, ev.points, overrides))
   }
-  const episodeNumbers = (episodes ?? []).map((e) => e.episode_number)
+  // Show the episodes that have results, plus the next one (at least three columns).
+  const maxScoredEpisode = Math.max(0, ...Array.from(scoredEpisodeNumbers))
+  const episodeNumbers = (episodes ?? [])
+    .map((e) => e.episode_number)
+    .filter((n) => n <= Math.max(maxScoredEpisode + 1, 3))
   const contestantNameById = new Map((contestants ?? []).map((c) => [c.id, c.name]))
 
-  const lbTeams: LeaderboardTeam[] = (leagueTeams ?? []).map((t) => ({
-    id: t.id,
-    name: t.name,
-    draftSpot: t.draft_spot,
-    members: (members ?? [])
-      .filter((m) => m.team_id === t.id)
-      .map((m) => {
+  // Leagues without teams: every member is a one-person team, so everyone gets the same leaderboard.
+  const lbTeams: LeaderboardTeam[] = teamMode
+    ? (leagueTeams ?? []).map((t) => ({
+        id: t.id,
+        name: t.name,
+        draftSpot: t.draft_spot,
+        members: (members ?? [])
+          .filter((m) => m.team_id === t.id)
+          .map((m) => {
+            const profile = m.profiles as unknown as { display_name: string } | null
+            return m.display_name ?? profile?.display_name ?? 'Member'
+          }),
+      }))
+    : (members ?? []).map((m, i) => {
         const profile = m.profiles as unknown as { display_name: string } | null
-        return m.display_name ?? profile?.display_name ?? 'Member'
-      }),
-  }))
+        return { id: m.user_id, name: m.display_name ?? profile?.display_name ?? 'Member', draftSpot: i + 1, members: [] }
+      })
   const lbBakers: LeaderboardBaker[] = (allDraftPicks ?? [])
-    .filter((p) => p.team_id)
+    .filter((p) => (teamMode ? p.team_id : p.team_id === null && p.user_id))
     .map((p, i) => {
       const elimEp = eliminatedEpByContestant.get(p.contestant_id) ?? null
       const perEpisode: Record<number, number | null> = {}
@@ -295,7 +347,7 @@ export default async function LeaguePage({
       return {
         id: p.contestant_id,
         name: contestantNameById.get(p.contestant_id) ?? 'Unknown',
-        teamId: p.team_id as string,
+        teamId: (teamMode ? p.team_id : p.user_id) as string,
         pickOrder: i,
         eliminatedEpisode: elimEp,
         perEpisode,
@@ -325,9 +377,13 @@ export default async function LeaguePage({
         </p>
       )}
 
-      {teamMode && (
-        <DraftLeaderboard teams={lbTeams} bakers={lbBakers} episodeNumbers={episodeNumbers} myTeamId={myTeamId} />
-      )}
+      <DraftLeaderboard
+        teams={lbTeams}
+        bakers={lbBakers}
+        episodeNumbers={episodeNumbers}
+        myTeamId={teamMode ? myTeamId : user!.id}
+        individual={!teamMode}
+      />
 
       <ContestantBios contestants={contestants ?? []} />
 
@@ -391,9 +447,6 @@ export default async function LeaguePage({
       </section>
 
       <EpisodesSection episodes={episodes} />
-      {!teamMode && (
-        <StandingsSection members={members} standingsSource={standingsSource} currentUserId={user!.id} />
-      )}
     </div>
   )
 }
@@ -414,68 +467,17 @@ function EpisodesSection({
             <span
               className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                 e.status === 'results_posted'
-                  ? 'bg-emerald-100 text-emerald-700'
+                  ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
                   : e.status === 'aired'
-                    ? 'bg-amber-100 text-amber-700'
-                    : 'bg-zinc-100 text-zinc-600'
+                    ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
+                    : 'bg-zinc-500/15 text-zinc-600'
               }`}
             >
-              {e.status.replace('_', ' ')}
+              {e.status === 'upcoming' ? 'upcoming' : e.status === 'aired' ? 'aired' : 'results in'}
             </span>
           </li>
         ))}
       </ul>
-    </section>
-  )
-}
-
-function StandingsSection({
-  members,
-  standingsSource,
-  currentUserId,
-}: {
-  members:
-    | {
-        user_id: string
-        display_name: string | null
-        avatar_url: string | null
-        profiles: unknown
-      }[]
-    | null
-  standingsSource: { user_id: string; points_awarded: number }[]
-  currentUserId: string
-}) {
-  const standings = (members ?? [])
-    .map((m) => {
-      const total = standingsSource
-        .filter((p) => p.user_id === m.user_id)
-        .reduce((sum, p) => sum + p.points_awarded, 0)
-      const profile = m.profiles as unknown as { display_name: string; avatar_url: string | null } | null
-      return {
-        userId: m.user_id,
-        name: m.display_name ?? profile?.display_name ?? 'Member',
-        avatarUrl: m.avatar_url ?? profile?.avatar_url ?? null,
-        total,
-      }
-    })
-    .sort((a, b) => b.total - a.total)
-
-  return (
-    <section className="card p-4">
-      <h2 className="text-xl font-bold">Standings</h2>
-      <ol className="mt-2 flex flex-col gap-2">
-        {standings.map((s) => (
-          <li
-            key={s.userId}
-            className={`flex items-center gap-2 ${s.userId === currentUserId ? 'font-bold' : ''}`}
-          >
-            <Avatar url={s.avatarUrl} name={s.name} size={28} />
-            <span>
-              {s.name}: {s.total} pts
-            </span>
-          </li>
-        ))}
-      </ol>
     </section>
   )
 }

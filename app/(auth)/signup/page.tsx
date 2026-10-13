@@ -16,7 +16,7 @@ export default function SignupPage() {
         <p className="rounded border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-700">
           We sent you a confirmation link. Click it to verify your email, then log in.
         </p>
-        <a href="/login" className="text-sm font-semibold text-fuchsia-700 underline">
+        <a href="/login" className="text-sm font-semibold text-fuchsia-700 underline dark:text-fuchsia-300">
           Go to login
         </a>
       </div>

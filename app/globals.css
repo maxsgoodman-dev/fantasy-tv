@@ -140,4 +140,20 @@ input[type='file']::file-selector-button:hover {
   .border-fuchsia-200 { border-color: #86198f; }
 
   .hover\:text-fuchsia-700:hover { color: #e879f9; }
+
+  /* Alert / status tints used on forms, chips and the scoring guide. */
+  .bg-red-50 { background-color: rgba(239, 68, 68, 0.15); }
+  .bg-red-100 { background-color: rgba(239, 68, 68, 0.2); }
+  .border-red-300 { border-color: rgba(248, 113, 113, 0.5); }
+  .text-red-600 { color: #f87171; }
+  .text-red-700 { color: #fca5a5; }
+  .bg-amber-100 { background-color: rgba(245, 158, 11, 0.2); }
+  .text-amber-700 { color: #fcd34d; }
+  .text-amber-800 { color: #fcd34d; }
+  .bg-emerald-50 { background-color: rgba(16, 185, 129, 0.15); }
+  .bg-emerald-100 { background-color: rgba(16, 185, 129, 0.2); }
+  .border-emerald-300 { border-color: rgba(52, 211, 153, 0.5); }
+  .text-emerald-600 { color: #34d399; }
+  .text-emerald-700 { color: #6ee7b7; }
+  .border-zinc-300 { border-color: #52525b; }
 }

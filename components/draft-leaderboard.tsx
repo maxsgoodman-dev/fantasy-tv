@@ -39,11 +39,14 @@ export function DraftLeaderboard({
   bakers,
   episodeNumbers,
   myTeamId,
+  individual = false,
 }: {
   teams: LeaderboardTeam[]
   bakers: LeaderboardBaker[]
   episodeNumbers: number[]
   myTeamId: string | null
+  /** each "team" is one player (leagues without teams) */
+  individual?: boolean
 }) {
   const teamIndex = new Map(teams.map((t, i) => [t.id, i]))
   const bakerTotal = (b: LeaderboardBaker) => Object.values(b.perEpisode).reduce<number>((s, v) => s + (v ?? 0), 0)
@@ -69,7 +72,7 @@ export function DraftLeaderboard({
   return (
     <div className="flex flex-col gap-8">
       <section className="card p-4">
-        <h2 className="text-xl font-bold">Team standings</h2>
+        <h2 className="text-xl font-bold">{individual ? 'Standings' : 'Team standings'}</h2>
         <ol className="mt-3 flex flex-col gap-2">
           {standings.map((s, i) => {
             const a = accentFor(teamIndex.get(s.team.id) ?? 0)
@@ -86,7 +89,7 @@ export function DraftLeaderboard({
                 <div className="min-w-0 flex-1">
                   <div className={`truncate font-bold ${a.text}`}>
                     {s.team.name}
-                    {s.team.id === myTeamId && <span className="ml-2 text-xs font-semibold text-fuchsia-700 dark:text-fuchsia-300">(your team)</span>}
+                    {s.team.id === myTeamId && <span className="ml-2 text-xs font-semibold text-fuchsia-700 dark:text-fuchsia-300">{individual ? '(you)' : '(your team)'}</span>}
                   </div>
                   <div className="truncate text-xs text-zinc-600">
                     {s.alive} of {s.count} bakers still in
@@ -114,7 +117,7 @@ export function DraftLeaderboard({
             <thead>
               <tr className="border-b-2 border-zinc-300 text-left text-xs uppercase tracking-wide text-zinc-500">
                 <th className="py-2 pr-3">Baker</th>
-                <th className="py-2 pr-3">Team</th>
+                <th className="py-2 pr-3">{individual ? 'Player' : 'Team'}</th>
                 <th className="py-2 pr-3 text-right">Total</th>
                 {episodeNumbers.map((n) => (
                   <th key={n} className="px-2 py-2 text-center">

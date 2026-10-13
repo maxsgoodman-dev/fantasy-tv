@@ -17,7 +17,7 @@ export function JoinForm({ code, leagueName }: { code: string; leagueName: strin
           We sent you a confirmation link. Tap it and you&apos;ll be added to{' '}
           <strong>{state.leagueName ?? leagueName ?? 'the league'}</strong> automatically.
         </p>
-        <a href="/login" className="text-sm font-semibold text-fuchsia-700 underline">
+        <a href="/login" className="text-sm font-semibold text-fuchsia-700 underline dark:text-fuchsia-300">
           Already confirmed? Log in
         </a>
       </div>
@@ -72,7 +72,7 @@ export function JoinForm({ code, leagueName }: { code: string; leagueName: strin
       </button>
       <p className="text-center text-sm text-zinc-600">
         Already have an account?{' '}
-        <a href="/login" className="font-semibold text-fuchsia-700 underline">
+        <a href="/login" className="font-semibold text-fuchsia-700 underline dark:text-fuchsia-300">
           Log in
         </a>
         , then enter the code from your dashboard.

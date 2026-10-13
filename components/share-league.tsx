@@ -47,7 +47,7 @@ export function ShareLeague({ leagueName, joinCode }: { leagueName: string; join
         <button type="button" onClick={share} className="rounded-full bg-fuchsia-600 px-4 py-2 text-sm font-semibold text-white">
           Share invite
         </button>
-        <button type="button" onClick={copy} className="rounded-full border border-fuchsia-600 px-4 py-2 text-sm font-semibold text-fuchsia-700">
+        <button type="button" onClick={copy} className="rounded-full border border-fuchsia-600 px-4 py-2 text-sm font-semibold text-fuchsia-700 dark:text-fuchsia-300">
           Copy link
         </button>
       </div>

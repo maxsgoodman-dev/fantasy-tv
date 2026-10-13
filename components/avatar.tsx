@@ -20,7 +20,7 @@ export function Avatar({
   return (
     <div
       style={style}
-      className="flex items-center justify-center rounded-full bg-fuchsia-200 font-bold text-fuchsia-700"
+      className="flex items-center justify-center rounded-full bg-fuchsia-200 font-bold text-fuchsia-700 dark:bg-fuchsia-900 dark:text-fuchsia-200"
     >
       {initial}
     </div>
