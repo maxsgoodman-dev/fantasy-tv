@@ -204,6 +204,16 @@ export default async function LeaguePage({
     .eq('league_id', leagueId)
     .order('draft_spot', { ascending: true, nullsFirst: false })
   const teamMode = (leagueTeams ?? []).length > 0
+  const draftGuide = teamMode ? (
+    <ScoringGuide
+      rules={effectiveRules(rulesetForShowName(show?.name), overrides)}
+      format={league?.format ?? ''}
+      maxPicks={maxPicks}
+      teamDraft
+    />
+  ) : (
+    guide
+  )
   const myMembership = (members ?? []).find((m) => m.user_id === user!.id)
   const myTeamId: string | null = (myMembership?.team_id as string | null | undefined) ?? null
 
@@ -321,7 +331,7 @@ export default async function LeaguePage({
 
       <ContestantBios contestants={contestants ?? []} />
 
-        {guide}
+        {draftGuide}
 
       <section className="flex flex-col gap-4">
         <h2 className="text-xl font-bold">{teamMode ? 'Your team’s draft' : 'Your season draft'}</h2>

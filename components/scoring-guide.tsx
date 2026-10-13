@@ -9,10 +9,13 @@ export function ScoringGuide({
   rules,
   format,
   maxPicks,
+  teamDraft = false,
 }: {
   rules: EffectiveRule[]
   format: 'weekly_vote' | 'bracket' | string
   maxPicks: number | null
+  /** Teams were drafted in person (one team per baker); nothing to pick on the site. */
+  teamDraft?: boolean
 }) {
   const categories = Array.from(new Set(rules.map((r) => r.category)))
   const modifiedCount = rules.filter((r) => r.modified).length
@@ -30,7 +33,9 @@ export function ScoringGuide({
 
       <div className="mt-3 flex flex-col gap-4 text-sm">
         <p className="text-zinc-600">
-          {format === 'weekly_vote'
+          {teamDraft
+            ? `Teams were drafted in person: each baker is on one team only${maxPicks ? `, up to ${maxPicks} bakers per team` : ''}. The draft is locked, so there is nothing to pick. Your team earns the points its bakers score in every episode, starting with Episode 3, and your total is the sum across the season.`
+            : format === 'weekly_vote'
             ? `Pick your team before each episode airs${maxPicks ? ` (up to ${maxPicks} contestants)` : ''}. Picks lock when the episode airs, and your team earns the points its contestants score in that episode. Your total is the sum across all episodes.`
             : `Draft your team once${maxPicks ? ` (up to ${maxPicks} contestants)` : ''} before the draft locks. Your team earns points from every episode all season, so early picks that last are worth the most.`}
         </p>
