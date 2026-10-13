@@ -14,7 +14,7 @@ export default async function LeagueDraftOverviewPage({
 
   const { data: league } = await supabase
     .from('leagues')
-    .select('name, season_id, join_code, scoring_overrides')
+    .select('name, season_id, join_code, scoring_overrides, draft_locks_at')
     .eq('id', leagueId)
     .single()
 
@@ -25,7 +25,8 @@ export default async function LeagueDraftOverviewPage({
     .order('episode_number')
 
   const draftLockEpisode = episodes?.find((e) => e.episode_number === 2)
-  const draftLocked = draftLockEpisode ? draftLockEpisode.air_date <= new Date().toISOString() : false
+  const lockAt = league?.draft_locks_at ?? draftLockEpisode?.air_date ?? null
+  const draftLocked = lockAt ? lockAt <= new Date().toISOString() : false
 
   const { data: eliminationEvents } = await supabase
     .from('episode_events')
@@ -47,15 +48,17 @@ export default async function LeagueDraftOverviewPage({
 
   const { data: draftPicks } = await supabase
     .from('draft_picks')
-    .select('user_id, contestant_id, profiles(display_name), contestants(name)')
+    .select('user_id, team_id, contestant_id, profiles(display_name), contestants(name), league_teams(name)')
     .eq('league_id', leagueId)
 
   const byMember = new Map<string, { name: string; picks: { name: string; contestantId: string }[] }>()
   for (const p of draftPicks ?? []) {
-    const memberName = (p.profiles as unknown as { display_name: string } | null)?.display_name ?? 'Member'
+    const teamName = (p.league_teams as unknown as { name: string } | null)?.name
+    const memberName = teamName ?? (p.profiles as unknown as { display_name: string } | null)?.display_name ?? 'Member'
     const contestantName = (p.contestants as unknown as { name: string } | null)?.name ?? 'Unknown'
-    if (!byMember.has(p.user_id)) byMember.set(p.user_id, { name: memberName, picks: [] })
-    byMember.get(p.user_id)!.picks.push({ name: contestantName, contestantId: p.contestant_id })
+    const key = p.team_id ?? p.user_id ?? p.contestant_id
+    if (!byMember.has(key)) byMember.set(key, { name: memberName, picks: [] })
+    byMember.get(key)!.picks.push({ name: contestantName, contestantId: p.contestant_id })
   }
 
   return (
@@ -68,8 +71,9 @@ export default async function LeagueDraftOverviewPage({
         Join code: <span className="font-mono">{league?.join_code}</span>
       </p>
       <p className="text-sm text-zinc-600">
-        This is a season-long draft league — members pick their team themselves (locks when Episode 2
-        airs{draftLockEpisode ? `, ${new Date(draftLockEpisode.air_date).toLocaleString()}` : ''}). Log
+        This is a season-long draft league — members pick their team themselves (locks{' '}
+        {league?.draft_locks_at ? new Date(league.draft_locks_at).toLocaleString() : `when Episode 2 airs${draftLockEpisode ? `, ${new Date(draftLockEpisode.air_date).toLocaleString()}` : ''}`}).{' '}
+        <a href={`/admin/leagues/${leagueId}/teams`} className="underline">Manage teams</a>. Log
         events for each episode from the &quot;Log events&quot; page — points accumulate automatically for
         every drafted contestant. Draft status: <strong>{draftLocked ? 'Locked' : 'Open'}</strong>.
       </p>

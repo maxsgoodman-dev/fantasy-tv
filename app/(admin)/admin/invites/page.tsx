@@ -23,6 +23,7 @@ type InviteRow = {
   last_sent_at: string
   league_id: string
   leagues: { name: string } | null
+  league_teams: { name: string } | null
 }
 
 const fmt = (iso: string | null) =>
@@ -49,7 +50,7 @@ export default async function InvitesPage({
     supabase.from('leagues').select('id, name, join_code').order('name'),
     supabase
       .from('league_invites')
-      .select('id, email, created_at, last_sent_at, league_id, leagues(name)')
+      .select('id, email, created_at, last_sent_at, league_id, leagues(name), league_teams(name)')
       .order('created_at', { ascending: false }),
     supabase.rpc('admin_user_overview'),
   ])
@@ -138,7 +139,7 @@ export default async function InvitesPage({
                 <div className="min-w-0 flex-1">
                   <div className="truncate font-semibold">{inv.email}</div>
                   <div className="text-sm text-zinc-600">
-                    {inv.leagues?.name ?? 'League'} · invited {fmt(inv.created_at)}
+                    {inv.leagues?.name ?? 'League'}{inv.league_teams ? ` · team: ${inv.league_teams.name}` : ''} · invited {fmt(inv.created_at)}
                     {inv.last_sent_at !== inv.created_at && ` · last sent ${fmt(inv.last_sent_at)}`}
                   </div>
                   {u && u.leagues.length > 0 && (

@@ -46,6 +46,14 @@ export default async function LeaguesPage() {
               </a>
               {league.format === 'bracket' && (
                 <a
+                  href={`/admin/leagues/${league.id}/teams`}
+                  className="rounded bg-zinc-200 px-3 py-1 text-sm font-semibold text-zinc-700"
+                >
+                  Teams
+                </a>
+              )}
+              {league.format === 'bracket' && (
+                <a
                   href={`/admin/leagues/${league.id}/bracket`}
                   className="rounded bg-zinc-700 px-3 py-1 text-sm font-semibold text-white"
                 >

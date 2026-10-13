@@ -80,22 +80,8 @@ export async function saveDraft(leagueId: string, formData: FormData) {
   } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: league } = await supabase
-    .from('leagues')
-    .select('season_id, max_picks, draft_locks_at')
-    .eq('id', leagueId)
-    .single()
+  const { data: league } = await supabase.from('leagues').select('season_id, max_picks').eq('id', leagueId).single()
   if (!league) failSave(leagueId, 'League not found.')
-
-  const { data: lockEpisode } = await supabase
-    .from('episodes')
-    .select('air_date')
-    .eq('season_id', league.season_id)
-    .eq('episode_number', 2)
-    .maybeSingle()
-
-  const lockAt = league.draft_locks_at ?? lockEpisode?.air_date ?? null
-  if (lockAt && new Date(lockAt) <= new Date()) failSave(leagueId, 'The draft is locked.')
 
   const contestantIds = await onlySeasonContestants(
     supabase,
@@ -103,28 +89,15 @@ export async function saveDraft(leagueId: string, formData: FormData) {
     capPicks(formData.getAll('contestantId') as string[], league.max_picks)
   )
 
-  // Same order as saveLineup: insert/keep the new picks, then drop the rest.
-  if (contestantIds.length > 0) {
-    const { error } = await supabase
-      .from('draft_picks')
-      .upsert(
-        contestantIds.map((contestantId) => ({ league_id: leagueId, user_id: user.id, contestant_id: contestantId })),
-        { onConflict: 'league_id,user_id,contestant_id' }
-      )
-    if (error) {
-      failSave(
-        leagueId,
-        error.code === '23505'
-          ? 'One of those bakers was already drafted by another team. Refresh and pick someone else.'
-          : error.message
-      )
-    }
-  }
-
-  let cleanup = supabase.from('draft_picks').delete().eq('league_id', leagueId).eq('user_id', user.id)
-  if (contestantIds.length > 0) cleanup = cleanup.not('contestant_id', 'in', `(${contestantIds.join(',')})`)
-  const { error: cleanupError } = await cleanup
-  if (cleanupError) failSave(leagueId, cleanupError.message)
+  // One atomic, team-aware write in the database: it checks membership, the draft lock, the
+  // pick limit, "one team per baker" and eliminations, and lets any member of a team edit
+  // the team's shared picks. It returns a message on failure and null on success.
+  const { data: message, error } = await supabase.rpc('save_team_draft', {
+    p_league_id: leagueId,
+    p_contestant_ids: contestantIds,
+  })
+  if (error) failSave(leagueId, error.message)
+  if (message) failSave(leagueId, String(message))
 
   revalidatePath(`/leagues/${leagueId}`)
 }

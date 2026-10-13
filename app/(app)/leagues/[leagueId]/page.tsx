@@ -3,6 +3,7 @@ import { saveLineup, saveDraft } from './actions'
 import { Avatar } from '@/components/avatar'
 import { TeamPicker } from '@/components/team-picker'
 import { ShareLeague } from '@/components/share-league'
+import { DraftLeaderboard, type LeaderboardBaker, type LeaderboardTeam } from '@/components/draft-leaderboard'
 import { ContestantBios } from '@/components/contestant-bios'
 import { ScoringGuide } from '@/components/scoring-guide'
 import { scoreWeeklyLineup } from '@/lib/scoring/weekly-team'
@@ -73,7 +74,7 @@ export default async function LeaguePage({
 
   const { data: members } = await supabase
     .from('league_members')
-    .select('user_id, display_name, avatar_url, profiles(display_name, avatar_url)')
+    .select('user_id, team_id, display_name, avatar_url, profiles(display_name, avatar_url)')
     .eq('league_id', leagueId)
 
   const { data: episodes } = await supabase
@@ -197,15 +198,29 @@ export default async function LeaguePage({
   const draftLockAt = league?.draft_locks_at ?? draftLockEpisode?.air_date ?? null
   const draftLocked = draftLockAt ? draftLockAt <= new Date().toISOString() : false
 
-  const { data: myDraft } = await supabase
-    .from('draft_picks')
-    .select('contestant_id')
+  const { data: leagueTeams } = await supabase
+    .from('league_teams')
+    .select('id, name, draft_spot')
     .eq('league_id', leagueId)
-    .eq('user_id', user!.id)
+    .order('draft_spot', { ascending: true, nullsFirst: false })
+  const teamMode = (leagueTeams ?? []).length > 0
+  const myMembership = (members ?? []).find((m) => m.user_id === user!.id)
+  const myTeamId: string | null = (myMembership?.team_id as string | null | undefined) ?? null
+
+  const { data: allDraftPicks } = await supabase
+    .from('draft_picks')
+    .select('user_id, team_id, contestant_id, created_at')
+    .eq('league_id', leagueId)
+    .order('created_at')
+
+  // A team's picks are shared by everyone on the team; a teamless member has their own.
+  const isMine = (p: { user_id: string | null; team_id: string | null }) =>
+    teamMode && myTeamId ? p.team_id === myTeamId : p.team_id === null && p.user_id === user!.id
+  const myDraft = (allDraftPicks ?? []).filter(isMine)
 
   const { data: eliminationEvents } = await supabase
     .from('episode_events')
-    .select('contestant_id')
+    .select('contestant_id, episode_id')
     .eq('event_type', 'eliminated')
     .in('episode_id', (episodes ?? []).map((e) => e.id))
 
@@ -213,7 +228,7 @@ export default async function LeaguePage({
 
   const { data: allSeasonEvents } = await supabase
     .from('contestant_episode_events')
-    .select('contestant_id, points, event_code, episodes!inner(season_id)')
+    .select('contestant_id, points, event_code, episode_id, episodes!inner(season_id)')
     .eq('episodes.season_id', league!.season_id)
 
   const seasonEventPoints = (allSeasonEvents ?? []).map((e) => ({
@@ -221,19 +236,63 @@ export default async function LeaguePage({
     points: effectivePoints(e.event_code, e.points, overrides),
   }))
 
-  const { data: allDraftPicks } = await supabase
-    .from('draft_picks')
-    .select('user_id, contestant_id')
-    .eq('league_id', leagueId)
-
   const standingsSource = (members ?? []).map((m) => {
     const picks = (allDraftPicks ?? [])
-      .filter((p) => p.user_id === m.user_id)
+      .filter((p) => p.team_id === null && p.user_id === m.user_id)
       .map((p) => ({ contestantId: p.contestant_id }))
     return { user_id: m.user_id, points_awarded: scoreWeeklyLineup(picks, seasonEventPoints) }
   })
 
-  const myPickIds = new Set((myDraft ?? []).map((p) => p.contestant_id))
+  // Team leaderboard data (spreadsheet-style: baker x episode, plus a team standings box).
+  const epNumberById = new Map((episodes ?? []).map((e) => [e.id, e.episode_number]))
+  const eliminatedEpByContestant = new Map<string, number>()
+  for (const ev of eliminationEvents ?? []) {
+    const n = epNumberById.get(ev.episode_id)
+    if (n !== undefined) eliminatedEpByContestant.set(ev.contestant_id, n)
+  }
+  const scoredEpisodeNumbers = new Set<number>()
+  const pointsByBakerEp = new Map<string, number>()
+  for (const ev of allSeasonEvents ?? []) {
+    const n = epNumberById.get(ev.episode_id)
+    if (n === undefined) continue
+    scoredEpisodeNumbers.add(n)
+    const key = `${ev.contestant_id}:${n}`
+    pointsByBakerEp.set(key, (pointsByBakerEp.get(key) ?? 0) + effectivePoints(ev.event_code, ev.points, overrides))
+  }
+  const episodeNumbers = (episodes ?? []).map((e) => e.episode_number)
+  const contestantNameById = new Map((contestants ?? []).map((c) => [c.id, c.name]))
+
+  const lbTeams: LeaderboardTeam[] = (leagueTeams ?? []).map((t) => ({
+    id: t.id,
+    name: t.name,
+    draftSpot: t.draft_spot,
+    members: (members ?? [])
+      .filter((m) => m.team_id === t.id)
+      .map((m) => {
+        const profile = m.profiles as unknown as { display_name: string } | null
+        return m.display_name ?? profile?.display_name ?? 'Member'
+      }),
+  }))
+  const lbBakers: LeaderboardBaker[] = (allDraftPicks ?? [])
+    .filter((p) => p.team_id)
+    .map((p, i) => {
+      const elimEp = eliminatedEpByContestant.get(p.contestant_id) ?? null
+      const perEpisode: Record<number, number | null> = {}
+      for (const n of episodeNumbers) {
+        perEpisode[n] =
+          elimEp !== null && n > elimEp ? null : scoredEpisodeNumbers.has(n) ? (pointsByBakerEp.get(`${p.contestant_id}:${n}`) ?? 0) : null
+      }
+      return {
+        id: p.contestant_id,
+        name: contestantNameById.get(p.contestant_id) ?? 'Unknown',
+        teamId: p.team_id as string,
+        pickOrder: i,
+        eliminatedEpisode: elimEp,
+        perEpisode,
+      }
+    })
+
+  const myPickIds = new Set(myDraft.map((p) => p.contestant_id))
 
   return (
     <div className="flex flex-col gap-8">
@@ -256,13 +315,21 @@ export default async function LeaguePage({
         </p>
       )}
 
+      {teamMode && (
+        <DraftLeaderboard teams={lbTeams} bakers={lbBakers} episodeNumbers={episodeNumbers} myTeamId={myTeamId} />
+      )}
+
       <ContestantBios contestants={contestants ?? []} />
 
         {guide}
 
       <section className="flex flex-col gap-4">
-        <h2 className="text-xl font-bold">Your season draft</h2>
-        {draftLocked ? (
+        <h2 className="text-xl font-bold">{teamMode ? 'Your team’s draft' : 'Your season draft'}</h2>
+        {teamMode && !myTeamId ? (
+          <p className="card p-4 text-sm text-zinc-600">
+            You&apos;re in this league but not on a team yet. Ask the league organizer to add your email to your team.
+          </p>
+        ) : draftLocked ? (
           <div className="card flex flex-col gap-3 p-4">
             <p className="text-sm text-zinc-600">
               The draft is locked. Here&apos;s how your picks are doing:
@@ -300,7 +367,7 @@ export default async function LeaguePage({
               contestants={contestants ?? []}
               initialSelectedIds={Array.from(myPickIds)}
               maxPicks={maxPicks}
-              takenIds={(allDraftPicks ?? []).filter((p) => p.user_id !== user!.id).map((p) => p.contestant_id)}
+              takenIds={(allDraftPicks ?? []).filter((p) => !isMine(p)).map((p) => p.contestant_id)}
               eliminatedIds={Array.from(eliminatedContestantIds)}
             />
             <button
@@ -314,7 +381,9 @@ export default async function LeaguePage({
       </section>
 
       <EpisodesSection episodes={episodes} />
-      <StandingsSection members={members} standingsSource={standingsSource} currentUserId={user!.id} />
+      {!teamMode && (
+        <StandingsSection members={members} standingsSource={standingsSource} currentUserId={user!.id} />
+      )}
     </div>
   )
 }
