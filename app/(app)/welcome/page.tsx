@@ -12,7 +12,7 @@ export default async function WelcomePage({ searchParams }: { searchParams: Prom
   } = await supabase.auth.getUser()
 
   const { data: league } = leagueId
-    ? await supabase.from('leagues').select('id, name, format, seasons(shows(name))').eq('id', leagueId).maybeSingle()
+    ? await supabase.from('leagues').select('id, name, format, max_picks, seasons(shows(name))').eq('id', leagueId).maybeSingle()
     : { data: null }
   const showName = (league?.seasons as unknown as { shows: { name: string } } | null)?.shows?.name
 
@@ -28,11 +28,37 @@ export default async function WelcomePage({ searchParams }: { searchParams: Prom
       : { data: null }
   const myTeam = (teams ?? []).find((t) => t.id === membership?.team_id) ?? null
 
+  const noun = /bake/i.test(showName ?? '') ? 'bakers' : 'contestants'
+  const picksPhrase = league?.max_picks ? `${league.max_picks} contestants` : 'your contestants'
+  const shared = 'Everyone on your team shares the same picks and the same score.'
+
   let steps: Step[]
   let cta = league ? 'Make my picks' : 'Go to my leagues'
   let subtitle: string | null = null
 
-  if (league && teamLeague) {
+  if (league && league.format === 'weekly_vote') {
+    // Weekly leagues: picks are made on the site, fresh each episode.
+    cta = myTeam || !teamLeague ? 'Set my picks' : 'See the leaderboard'
+    subtitle = myTeam ? `You're on team ${myTeam.name}.` : null
+    steps = [
+      myTeam
+        ? { title: 'Your team is set', body: `You're on team ${myTeam.name}. ${shared}` }
+        : teamLeague
+          ? {
+              title: 'You’re in the league, but not on a team yet',
+              body: 'You signed up with an email that isn’t on a team. Tell the league organizer which team you’re on and they’ll add you.',
+            }
+          : { title: 'You’re in', body: 'Your picks and your score are yours alone in this league.' },
+      {
+        title: `Pick ${picksPhrase} each week`,
+        body: 'Choose a fresh lineup for every episode. Picks lock the moment that episode airs, so change your mind any time before then.',
+      },
+      {
+        title: 'Score points and climb the board',
+        body: 'After each episode every contestant’s points are posted. Your week is the sum of your picks, and the leaderboard updates right away.',
+      },
+    ]
+  } else if (league && teamLeague) {
     const { data: picks } = myTeam
       ? await supabase
           .from('draft_picks')
@@ -52,16 +78,16 @@ export default async function WelcomePage({ searchParams }: { searchParams: Prom
           {
             title: 'Your team is set',
             body: bakers.length
-              ? `Your bakers: ${bakers.join(', ')}. Everyone on your team shares the same bakers and the same score.`
-              : 'Your bakers are being added. Everyone on your team shares the same bakers and the same score.',
+              ? `Your ${noun}: ${bakers.join(', ')}. ${shared}`
+              : `Your ${noun} are being added. ${shared}`,
           },
           {
             title: locked ? 'The draft is done and locked' : 'The draft is done',
-            body: 'Picks were made in person, one team per baker. There is nothing to pick on the site.',
+            body: `Picks were made in person, one team per ${noun.slice(0, -1)}. There is nothing to pick on the site.`,
           },
           {
             title: 'Watch the leaderboard',
-            body: 'Points are added after each episode, starting with Episode 3. The team standings and every baker’s points update right away.',
+            body: `Points are added after each episode, starting with Episode 3. The team standings and every ${noun.slice(0, -1)}’s points update right away.`,
           },
         ]
       : [
