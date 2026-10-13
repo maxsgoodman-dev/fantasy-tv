@@ -52,3 +52,33 @@ describe('diffBakeoffSnapshots', () => {
     expect(diffBakeoffSnapshots(prev, next, ['Nikki'])).toEqual([])
   })
 })
+
+describe('Series 17 wiki wording', () => {
+  const S17_HTML = `
+<table>
+  <tr><th>Placement</th><th>Contestant</th><th>Photo</th><th>Age</th><th>Location</th><th>Ep. 1</th><th>Ep. 2</th><th>Ep. 3</th></tr>
+  <tr><td>TBA</td><td>Tom Whittaker</td><td></td><td>30</td><td>X</td><td style="background:#EEE8AA;">HIGH<span>TechChall.Winner</span></td><td style="background:#FFD700;"><b>STAR</b></td><td>TBA</td></tr>
+  <tr><td>TBA</td><td>Moyin Odeniran</td><td></td><td>30</td><td>X</td><td style="background:steelblue; color:#fff;">SAFE</td><td style="background:#F08080;">ELIM</td><td></td></tr>
+</table>`
+
+  it('reads STAR / ELIM / TechChall.Winner and steelblue handshake cells', () => {
+    const snap = parseBakeoffWiki(S17_HTML)
+    expect(snap['Tom Whittaker']).toEqual({ '1': 'HIGHTechChall.Winner', '2': 'STAR', '3': 'TBA' })
+    expect(snap['Moyin Odeniran']['1']).toBe('SAFE HANDSHAKE')
+
+    const codes = (ep: string, name: string) =>
+      diffBakeoffSnapshots({}, snap, ['Tom', 'Moyin'])
+        .filter((e) => String(e.episodeNumber) === ep && e.contestantName === name)
+        .map((e) => e.eventCode)
+    expect(codes('1', 'Tom')).toEqual(['pass_round', 'win_technical']) // not season_winner
+    expect(codes('2', 'Tom')).toEqual(['pass_round', 'star_baker'])
+    expect(codes('1', 'Moyin')).toEqual(['pass_round', 'hand_shake'])
+    expect(codes('2', 'Moyin')).toEqual(['eliminated']) // no pass point for ELIM
+  })
+
+  it('only suggests the newly added marker when a scored cell is edited later', () => {
+    const prev = { 'Moyin Odeniran': { '3': 'SAFE' } }
+    const next = { 'Moyin Odeniran': { '3': 'SAFE HANDSHAKE' } }
+    expect(diffBakeoffSnapshots(prev, next, ['Moyin']).map((e) => e.eventCode)).toEqual(['hand_shake'])
+  })
+})
