@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseBakeoffWiki, diffBakeoffSnapshots } from './parse-bakeoff-wiki'
+import { parseBakeoffWiki, diffBakeoffSnapshots, matchContestantName } from './parse-bakeoff-wiki'
 
 const HTML = `
 <html><body>
@@ -80,5 +80,28 @@ describe('Series 17 wiki wording', () => {
     const prev = { 'Moyin Odeniran': { '3': 'SAFE' } }
     const next = { 'Moyin Odeniran': { '3': 'SAFE HANDSHAKE' } }
     expect(diffBakeoffSnapshots(prev, next, ['Moyin']).map((e) => e.eventCode)).toEqual(['hand_shake'])
+  })
+})
+
+describe('name matching and departures', () => {
+  const names = ['Mo', 'Moyin', 'Molly', 'Clara', 'Nikki']
+
+  it('does not hand Moyin or Molly results to Mo', () => {
+    expect(matchContestantName('Mo Mahirr', names)).toBe('Mo')
+    expect(matchContestantName('Moyin Odeniran', names)).toBe('Moyin')
+    expect(matchContestantName('Molly Chauhan', names)).toBe('Molly')
+    expect(matchContestantName('Clara Satchell-Silva', names)).toBe('Clara')
+    expect(matchContestantName('Nikki', names)).toBe('Nikki')
+    expect(matchContestantName('Biscuit', names)).toBeUndefined()
+  })
+
+  it('treats DEPT (left the show) as out, with no pass point', () => {
+    const events = diffBakeoffSnapshots({}, { Nikki: { '4': 'DEPT' } }, names)
+    expect(events.map((e) => e.eventCode)).toEqual(['eliminated'])
+  })
+
+  it('credits Moyin, not Mo, when both are in the same diff', () => {
+    const next = { 'Mo Mahirr': { '4': 'SAFE' }, 'Moyin Odeniran': { '4': 'SAFE' } }
+    expect(diffBakeoffSnapshots({}, next, names).map((e) => e.contestantName)).toEqual(['Mo', 'Moyin'])
   })
 })

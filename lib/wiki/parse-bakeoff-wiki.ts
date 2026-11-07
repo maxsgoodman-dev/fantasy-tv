@@ -64,7 +64,9 @@ export function parseBakeoffWiki(html: string): BakeoffSnapshot {
 
 // The wiki's wording has varied by series: older pages used "OUT" / "STAR BAKER" /
 // "TECHNICAL WIN"; Series 17 uses "ELIM" / "STAR" / "TechChall.Winner".
+// "DEPT" marks a baker who left the show (withdrew) rather than being sent home.
 const ELIMINATED_PATTERN = /\b(OUT|ELIM|ELIMINATED)\b/i
+const DEPARTED_PATTERN = /\b(DEPT|DEPARTED|WITHDREW|WITHDRAWN|LEFT)\b/i
 const STAR_BAKER_PATTERN = /\bSTAR(\s*BAKER)?\b/i
 const TECHNICAL_WIN_PATTERN = /TECH\s*CHALL\.?\s*WINNER|TECHNICAL WIN|WON TECHNICAL|1ST.*TECHNICAL|TECHNICAL.*1ST/i
 const HANDSHAKE_PATTERN = /HANDSHAKE/i
@@ -74,14 +76,17 @@ const BLANK_PATTERN = /^(TBA|--|-|)$/i
 
 /**
  * A wiki contestant name like "Clara Satchell-Silva" needs matching against
- * our DB's first-name-only contestant records ("Clara"). Falls back to
- * substring match either direction.
+ * our DB's first-name-only contestant records ("Clara"). Exact matches win;
+ * a whole-word prefix ("Clara" in "Clara Satchell-Silva") is next. Never a
+ * bare substring prefix: "Mo" must not swallow "Moyin" or "Molly".
  */
-function matchContestantName(wikiName: string, dbNames: string[]): string | undefined {
+export function matchContestantName(wikiName: string, dbNames: string[]): string | undefined {
   const firstToken = wikiName.split(/\s+/)[0]
-  return dbNames.find(
-    (n) => n === firstToken || n === wikiName || wikiName.startsWith(n) || n.startsWith(firstToken)
-  )
+  const exact = dbNames.find((n) => n === wikiName) ?? dbNames.find((n) => n === firstToken)
+  if (exact) return exact
+  const wordPrefix = dbNames.filter((n) => wikiName.startsWith(`${n} `))
+  if (wordPrefix.length === 1) return wordPrefix[0]
+  return undefined
 }
 
 type CellEvent = Pick<SuggestedEvent, 'eventCode' | 'label' | 'points' | 'kind'>
@@ -91,6 +96,9 @@ export function eventsForCell(cellText: string): CellEvent[] {
   if (BLANK_PATTERN.test(cellText)) return [] // still hasn't aired
   if (ELIMINATED_PATTERN.test(cellText)) {
     return [{ eventCode: 'eliminated', label: 'Eliminated this episode (per wiki)', points: 0, kind: 'eliminated' }]
+  }
+  if (DEPARTED_PATTERN.test(cellText)) {
+    return [{ eventCode: 'eliminated', label: 'Left the competition this episode (per wiki)', points: 0, kind: 'eliminated' }]
   }
 
   const score = (code: string): CellEvent => {
