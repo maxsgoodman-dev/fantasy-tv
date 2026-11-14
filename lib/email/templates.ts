@@ -32,3 +32,10 @@ export function leagueInviteEmail(opts: { inviterName: string; leagueName: strin
     text: `${opts.inviterName} invited you to join "${opts.leagueName}" (${opts.showName}) on Fantasy TV.\n\nJoin here: ${opts.link}\n\nYou'll create a quick account with a username, email and password. Your league join code is ${opts.code} if you're asked for it.`,
   }
 }
+
+export function passwordResetEmail(link: string) {
+  return {
+    subject: 'Reset your Fantasy TV password',
+    text: `Someone (hopefully you) asked to reset your Fantasy TV password.\n\nChoose a new one here: ${link}\n\nThe link works once and expires in an hour. If you didn't ask for this, ignore this email and your password stays the same.`,
+  }
+}

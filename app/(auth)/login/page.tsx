@@ -17,6 +17,9 @@ export default function LoginPage() {
       )}
       <input name="email" type="email" placeholder="Email" required className="rounded border p-2" />
       <PasswordInput name="password" placeholder="Password" required />
+      <a href="/forgot-password" className="-mt-2 self-end text-sm text-fuchsia-700 underline dark:text-fuchsia-300">
+        Forgot password?
+      </a>
       <button
         type="submit"
         disabled={pending}

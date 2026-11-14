@@ -1,6 +1,6 @@
 import { requireAdmin } from '@/lib/auth/require-admin'
 import { DeleteButton } from '@/components/delete-button'
-import { inviteByEmail, resendInvite, deleteInvite } from './actions'
+import { inviteByEmail, resendInvite, deleteInvite, adminSendPasswordReset } from './actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,6 +28,17 @@ type InviteRow = {
 
 const fmt = (iso: string | null) =>
   iso ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
+
+function ResetPasswordButton({ email }: { email: string }) {
+  return (
+    <form action={adminSendPasswordReset}>
+      <input type="hidden" name="email" value={email} />
+      <button type="submit" className="rounded bg-zinc-200 px-3 py-1 text-sm font-semibold text-zinc-700" title="Email them a link to choose a new password">
+        Send password reset
+      </button>
+    </form>
+  )
+}
 
 function Badge({ tone, children }: { tone: 'green' | 'amber' | 'zinc'; children: React.ReactNode }) {
   const cls = {
@@ -90,7 +101,7 @@ export default async function InvitesPage({
       )}
       {sent && !error && (
         <p role="status" className="rounded border border-green-600 bg-green-50 p-3 text-sm text-green-800">
-          {Number(sent) === 1 ? 'Invite sent.' : `${sent} invites sent.`}
+          {Number.isNaN(Number(sent)) ? sent : Number(sent) === 1 ? 'Invite sent.' : `${sent} invites sent.`}
         </p>
       )}
       {usersError && (
@@ -152,6 +163,7 @@ export default async function InvitesPage({
                   {s.label}
                   {s.detail && ` · ${s.detail}`}
                 </Badge>
+                {u?.email_confirmed_at && u.email && <ResetPasswordButton email={u.email} />}
                 {s.label !== 'Joined' && (
                   <form action={resendInvite}>
                     <input type="hidden" name="invite_id" value={inv.id} />
@@ -190,6 +202,7 @@ export default async function InvitesPage({
                 </div>
               </div>
               {!u.email_confirmed_at && <Badge tone="amber">Email not confirmed</Badge>}
+              {u.email_confirmed_at && u.email && <ResetPasswordButton email={u.email} />}
               {u.pending_join_code && u.leagues.length === 0 && (() => {
                 const target = (leagues ?? []).find((l) => l.join_code?.toUpperCase() === u.pending_join_code!.toUpperCase())
                 return target ? (

@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { requireAdmin } from '@/lib/auth/require-admin'
 import { sendLeagueInvite, type InviteLeagueRow } from '@/lib/email/league-invite'
+import { sendPasswordReset } from '@/lib/auth/password-reset'
 
 function back(params: Record<string, string>): never {
   redirect(`/admin/invites?${new URLSearchParams(params).toString()}`)
@@ -101,4 +102,14 @@ export async function deleteInvite(formData: FormData) {
   if (error) back({ error: `Couldn't remove invite: ${error.message}` })
   revalidatePath('/admin/invites')
   back({})
+}
+
+/** Emails someone a link to choose a new password (for people who are locked out). */
+export async function adminSendPasswordReset(formData: FormData) {
+  await requireAdmin()
+  const email = z.string().trim().toLowerCase().email().safeParse(formData.get('email'))
+  if (!email.success) back({ error: 'Invalid email.' })
+  const err = await sendPasswordReset(email.data!)
+  if (err) back({ error: `Couldn't send the reset email to ${email.data}: ${err}` })
+  back({ sent: `Password reset link sent to ${email.data}.` })
 }

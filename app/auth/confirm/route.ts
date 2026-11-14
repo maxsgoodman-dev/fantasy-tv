@@ -13,10 +13,14 @@ export async function GET(request: NextRequest) {
     const supabase = await createClient()
     const { error } = await supabase.auth.verifyOtp({ type, token_hash })
     if (!error) {
+      // Password reset: signed in by the link, now send them to choose a new password.
+      // Only same-site paths are honoured so the link can't bounce people elsewhere.
+      const next = searchParams.get('next')
+      if (type === 'recovery') redirect(next?.startsWith('/') && !next.startsWith('//') ? next : '/reset-password')
       const leagueId = await joinPendingLeague(supabase)
       redirect(leagueId ? `/welcome?league=${leagueId}` : '/dashboard')
     }
   }
 
-  redirect('/login?error=confirmation_failed')
+  redirect(type === 'recovery' ? '/forgot-password?expired=1' : '/login?error=confirmation_failed')
 }
