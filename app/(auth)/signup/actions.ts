@@ -1,10 +1,7 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
 import { z } from 'zod'
-import { resend, EMAIL_FROM } from '@/lib/email/resend'
-import { welcomeEmail } from '@/lib/email/templates'
+import { createAccountWithConfirmation } from '@/lib/auth/signup-email'
 
 const SignupSchema = z.object({
   email: z.string().email(),
@@ -24,35 +21,12 @@ export async function signup(_prevState: SignupState, formData: FormData): Promi
     return { error: parsed.error.issues[0].message }
   }
 
-  const supabase = await createClient()
-  const { data, error } = await supabase.auth.signUp({
+  const { error } = await createAccountWithConfirmation({
     email: parsed.data.email,
     password: parsed.data.password,
-    options: { data: { display_name: parsed.data.displayName } },
+    data: { display_name: parsed.data.displayName },
+    displayName: parsed.data.displayName,
   })
-  if (error) {
-    return { error: error.message }
-  }
-
-  // If email confirmation is required, Supabase returns a user but no
-  // session — nothing to redirect into yet, so tell the user to check
-  // their inbox instead. (If confirmation isn't required, a session comes
-  // back immediately and we fall through to the normal redirect below.)
-  if (!data.session) {
-    return { confirmationSent: true }
-  }
-
-  try {
-    const { subject, text } = welcomeEmail(parsed.data.displayName)
-    await resend.emails.send({
-      from: EMAIL_FROM,
-      to: parsed.data.email,
-      subject,
-      text,
-    })
-  } catch {
-    // Don't block signup if the welcome email fails to send.
-  }
-
-  redirect('/dashboard')
+  if (error) return { error }
+  return { confirmationSent: true }
 }

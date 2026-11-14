@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js'
+import { createAuthAdminClient } from './admin-client'
 import { resend, EMAIL_FROM } from '@/lib/email/resend'
 import { passwordResetEmail } from '@/lib/email/templates'
 import { siteOrigin } from '@/lib/email/league-invite'
@@ -13,9 +13,7 @@ import { siteOrigin } from '@/lib/email/league-invite'
  * form can't be used to find out who has an account.
  */
 export async function sendPasswordReset(email: string): Promise<string | null> {
-  const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  })
+  const admin = createAuthAdminClient()
   const { data, error } = await admin.auth.admin.generateLink({ type: 'recovery', email })
   if (error || !data?.properties?.hashed_token) return null // no such account (or nothing to send)
 

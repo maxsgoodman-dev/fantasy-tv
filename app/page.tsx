@@ -1,6 +1,17 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
-export default function Home() {
+// Supabase-style email links (older signup confirmations) land on the site root
+// with ?code=... — hand those to the confirm route instead of showing the homepage.
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ code?: string; error_description?: string }>
+}) {
+  const { code, error_description } = await searchParams
+  if (code) redirect(`/auth/confirm?code=${encodeURIComponent(code)}`)
+  if (error_description) redirect('/login?notice=link-expired')
+
   return (
     <div className="flex flex-1 flex-col items-center justify-center bg-gradient-to-b from-fuchsia-700 via-fuchsia-600 to-purple-700 px-6 py-24 text-center text-white">
       <h1 className="text-5xl font-black tracking-tight sm:text-6xl">

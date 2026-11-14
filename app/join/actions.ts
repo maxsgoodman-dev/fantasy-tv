@@ -1,11 +1,9 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
-import { joinPendingLeague } from '@/lib/auth/join-pending'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
-import { resend, EMAIL_FROM } from '@/lib/email/resend'
-import { welcomeEmail } from '@/lib/email/templates'
+import { createAccountWithConfirmation } from '@/lib/auth/signup-email'
 
 const JoinSignupSchema = z.object({
   code: z.string().trim().min(1, 'Enter your league join code').max(20),
@@ -36,27 +34,16 @@ export async function signupAndJoin(_prev: JoinSignupState, formData: FormData):
     return { error: "That join code doesn't match a league. Double-check it with whoever invited you." }
   }
 
-  const { data, error } = await supabase.auth.signUp({
+  // The join code rides along in the new account's metadata; /auth/confirm joins the league
+  // once they tap the confirmation link (or joinPendingLeague does it on their next login).
+  const { error } = await createAccountWithConfirmation({
     email: parsed.data.email,
     password: parsed.data.password,
-    options: { data: { display_name: parsed.data.username, join_code: code } },
+    data: { display_name: parsed.data.username, join_code: code },
+    displayName: parsed.data.username,
   })
-  if (error) return { error: error.message }
-
-  // Email confirmation on: no session yet. The code rides along in the user's metadata and
-  // the league is joined automatically when they confirm (see /auth/confirm) or log in.
-  if (!data.session) return { confirmationSent: true, leagueName }
-
-  const leagueId = await joinPendingLeague(supabase)
-
-  try {
-    const { subject, text } = welcomeEmail(parsed.data.username)
-    await resend.emails.send({ from: EMAIL_FROM, to: parsed.data.email, subject, text })
-  } catch {
-    // Don't block signup if the welcome email fails to send.
-  }
-
-  redirect(leagueId ? `/welcome?league=${leagueId}` : '/dashboard')
+  if (error) return { error }
+  return { confirmationSent: true, leagueName }
 }
 
 /** For people who already have an account and are signed in: join with one click. */

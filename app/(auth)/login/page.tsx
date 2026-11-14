@@ -1,32 +1,15 @@
-'use client'
+import { LoginForm } from './login-form'
 
-import { useActionState } from 'react'
-import { login, type LoginState } from './actions'
-import { PasswordInput } from '@/components/password-input'
+const NOTICES: Record<string, { tone: 'green' | 'amber'; text: string }> = {
+  confirmed: { tone: 'green', text: 'Your email is confirmed. Log in to get started.' },
+  'link-expired': {
+    tone: 'amber',
+    text: 'That link has expired or was already used. If you already confirmed your email, just log in. Can’t remember your password? Use “Forgot password?” below.',
+  },
+}
 
-const initialState: LoginState = {}
-
-export default function LoginPage() {
-  const [state, formAction, pending] = useActionState(login, initialState)
-
-  return (
-    <form action={formAction} className="mx-auto mt-16 flex max-w-sm flex-col gap-4 p-4">
-      <h1 className="text-2xl font-bold">Log in</h1>
-      {state.error && (
-        <p className="rounded border border-red-300 bg-red-50 p-2 text-sm text-red-700">{state.error}</p>
-      )}
-      <input name="email" type="email" placeholder="Email" required className="rounded border p-2" />
-      <PasswordInput name="password" placeholder="Password" required />
-      <a href="/forgot-password" className="-mt-2 self-end text-sm text-fuchsia-700 underline dark:text-fuchsia-300">
-        Forgot password?
-      </a>
-      <button
-        type="submit"
-        disabled={pending}
-        className="rounded bg-fuchsia-600 p-2 font-semibold text-white"
-      >
-        {pending ? 'Logging in…' : 'Log in'}
-      </button>
-    </form>
-  )
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ notice?: string; error?: string }> }) {
+  const { notice, error } = await searchParams
+  const key = notice ?? (error === 'confirmation_failed' ? 'link-expired' : undefined)
+  return <LoginForm notice={key ? NOTICES[key] : undefined} />
 }

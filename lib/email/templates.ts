@@ -39,3 +39,10 @@ export function passwordResetEmail(link: string) {
     text: `Someone (hopefully you) asked to reset your Fantasy TV password.\n\nChoose a new one here: ${link}\n\nThe link works once and expires in an hour. If you didn't ask for this, ignore this email and your password stays the same.`,
   }
 }
+
+export function confirmSignupEmail(displayName: string, link: string) {
+  return {
+    subject: 'Confirm your Fantasy TV account',
+    text: `Hi ${displayName}, welcome to Fantasy TV!\n\nTap this link to confirm your email and finish signing up: ${link}\n\nIf you were joining a league, you'll be added automatically. The link works once and expires in 24 hours.`,
+  }
+}
