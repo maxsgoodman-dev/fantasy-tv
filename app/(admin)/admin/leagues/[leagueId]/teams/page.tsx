@@ -1,6 +1,6 @@
 import { requireAdmin } from '@/lib/auth/require-admin'
 import { DeleteButton } from '@/components/delete-button'
-import { createTeam, addTeamEmails, removeTeamEmail, assignMember, deleteTeam, setTeamPicks } from './actions'
+import { createTeam, addTeamEmails, removeTeamEmail, assignMember, addMemberToLeague, deleteTeam, setTeamPicks } from './actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -9,6 +9,7 @@ type UserRow = {
   email: string | null
   display_name: string | null
   email_confirmed_at: string | null
+  pending_join_code: string | null
 }
 
 export default async function LeagueTeamsPage({
@@ -43,6 +44,12 @@ export default async function LeagueTeamsPage({
   const userById = new Map(users.map((u) => [u.user_id, u]))
   const memberIds = new Set((members ?? []).map((m) => m.user_id))
   const unassigned = (members ?? []).filter((m) => !m.team_id)
+  // Signed up with this league's code but never got in (e.g. confirmed their email in another
+  // browser, so the automatic join didn't run). Admin can let them in from here.
+  const waiting = users.filter(
+    (u) => u.pending_join_code?.toUpperCase() === league.join_code?.toUpperCase() && !memberIds.has(u.user_id)
+  )
+  const inviteTeamByEmail = new Map((invites ?? []).filter((i) => i.team_id).map((i) => [i.email.toLowerCase(), i.team_id as string]))
   const teamOfBaker = new Map((picks ?? []).map((p) => [p.contestant_id, p.team_id as string | null]))
 
   return (
@@ -68,6 +75,43 @@ export default async function LeagueTeamsPage({
         <p role="status" className="rounded border border-green-600 bg-green-50 p-3 text-sm text-green-800">
           {ok}
         </p>
+      )}
+
+      {waiting.length > 0 && (
+        <section className="card flex flex-col gap-2 p-4">
+          <h2 className="text-lg font-bold">Waiting to join</h2>
+          <p className="text-sm text-zinc-600">
+            They signed up with this league&apos;s code but aren&apos;t in yet. Add them (and pick their team) here.
+          </p>
+          {waiting.map((u) => (
+            <form key={u.user_id} action={addMemberToLeague.bind(null, leagueId)} className="flex flex-wrap items-center gap-2">
+              <input type="hidden" name="user_id" value={u.user_id} />
+              <span className="min-w-0 flex-1 truncate text-sm font-semibold">
+                {u.display_name ?? 'New user'} <span className="font-normal text-zinc-600">{u.email}</span>
+                {!u.email_confirmed_at && (
+                  <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+                    email not confirmed — they can&apos;t log in yet
+                  </span>
+                )}
+              </span>
+              <select
+                name="team_id"
+                defaultValue={(u.email && inviteTeamByEmail.get(u.email.toLowerCase())) ?? ''}
+                className="rounded border p-1 text-sm"
+              >
+                <option value="">No team yet</option>
+                {teams?.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+              <button type="submit" className="rounded bg-green-700 px-3 py-1 text-sm font-semibold text-white">
+                Add to league
+              </button>
+            </form>
+          ))}
+        </section>
       )}
 
       {unassigned.length > 0 && (

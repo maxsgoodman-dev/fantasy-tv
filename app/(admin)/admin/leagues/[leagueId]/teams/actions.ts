@@ -35,7 +35,7 @@ async function syncMembers(admin: Admin, leagueId: string) {
     const uid = userByEmail.get(inv.email.toLowerCase())
     const m = (members ?? []).find((x) => x.user_id === uid)
     if (m && m.team_id !== inv.team_id) {
-      await supabase.from('league_members').update({ team_id: inv.team_id }).eq('league_id', leagueId).eq('user_id', m.user_id)
+      await supabase.rpc('admin_set_member_team', { p_league_id: leagueId, p_user_id: m.user_id, p_team_id: inv.team_id })
     }
   }
 }
@@ -113,7 +113,9 @@ export async function removeTeamEmail(leagueId: string, formData: FormData) {
   const uid = ((users ?? []) as { user_id: string; email: string | null }[]).find(
     (u) => u.email?.toLowerCase() === inv?.email.toLowerCase()
   )?.user_id
-  if (uid) await admin.supabase.from('league_members').update({ team_id: null }).eq('league_id', leagueId).eq('user_id', uid)
+  if (uid) {
+    await admin.supabase.rpc('admin_set_member_team', { p_league_id: leagueId, p_user_id: uid, p_team_id: null })
+  }
   revalidatePath(`/admin/leagues/${leagueId}/teams`)
   back(leagueId, { ok: 'Email removed from the team.' })
 }
@@ -124,14 +126,33 @@ export async function assignMember(leagueId: string, formData: FormData) {
     .object({ userId: z.string().uuid(), teamId: z.string().uuid() })
     .safeParse({ userId: formData.get('user_id'), teamId: formData.get('team_id') })
   if (!parsed.success) back(leagueId, { error: 'Pick a team first.' })
-  const { error } = await admin.supabase
-    .from('league_members')
-    .update({ team_id: parsed.data.teamId })
-    .eq('league_id', leagueId)
-    .eq('user_id', parsed.data.userId)
+  // Members can't write team_id directly (column grants), so admins go through a security-definer RPC.
+  const { error } = await admin.supabase.rpc('admin_set_member_team', {
+    p_league_id: leagueId,
+    p_user_id: parsed.data!.userId,
+    p_team_id: parsed.data!.teamId,
+  })
   if (error) back(leagueId, { error: error.message })
   revalidatePath(`/admin/leagues/${leagueId}/teams`)
   back(leagueId, { ok: 'Member added to the team.' })
+}
+
+/** Lets someone in whose signup stalled before the automatic join (or who never used the code). */
+export async function addMemberToLeague(leagueId: string, formData: FormData) {
+  const admin = await requireAdmin()
+  const parsed = z
+    .object({ userId: z.string().uuid(), teamId: z.union([z.string().uuid(), z.literal('')]) })
+    .safeParse({ userId: formData.get('user_id'), teamId: formData.get('team_id') ?? '' })
+  if (!parsed.success) back(leagueId, { error: 'Could not read that person.' })
+  const { error } = await admin.supabase.rpc('admin_add_member', {
+    p_league_id: leagueId,
+    p_user_id: parsed.data!.userId,
+    p_team_id: parsed.data!.teamId || null,
+  })
+  if (error) back(leagueId, { error: error.message })
+  revalidatePath(`/admin/leagues/${leagueId}/teams`)
+  revalidatePath(`/leagues/${leagueId}`)
+  back(leagueId, { ok: 'Added to the league.' })
 }
 
 export async function deleteTeam(leagueId: string, teamId: string) {

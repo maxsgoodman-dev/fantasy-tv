@@ -190,9 +190,16 @@ export default async function InvitesPage({
                 </div>
               </div>
               {!u.email_confirmed_at && <Badge tone="amber">Email not confirmed</Badge>}
-              {u.pending_join_code && u.leagues.length === 0 && (
-                <Badge tone="amber">Waiting to join {u.pending_join_code}</Badge>
-              )}
+              {u.pending_join_code && u.leagues.length === 0 && (() => {
+                const target = (leagues ?? []).find((l) => l.join_code?.toUpperCase() === u.pending_join_code!.toUpperCase())
+                return target ? (
+                  <a href={`/admin/leagues/${target.id}/teams`} className="underline">
+                    <Badge tone="amber">Waiting to join {target.name} — add them →</Badge>
+                  </a>
+                ) : (
+                  <Badge tone="amber">Waiting to join {u.pending_join_code}</Badge>
+                )
+              })()}
             </li>
           ))}
         </ul>
