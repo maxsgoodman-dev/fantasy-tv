@@ -1,6 +1,7 @@
 import * as cheerio from 'cheerio'
 import { findRule } from '../scoring/traitors-rules'
 import type { SuggestedEvent } from './types'
+import { matchContestantName } from './match-name'
 
 type ContestantRow = { faction: string; result: string; exitEpisode: string }
 /** name -> { faction, result, exitEpisode } */
@@ -52,10 +53,6 @@ export function parseTraitorsWiki(html: string): TraitorsSnapshot {
   })
 
   return snapshot
-}
-
-function matchContestantName(wikiName: string, dbNames: string[]): string | undefined {
-  return dbNames.find((n) => n === wikiName || wikiName.includes(n) || n.includes(wikiName))
 }
 
 export function diffTraitorsSnapshots(

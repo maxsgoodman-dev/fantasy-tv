@@ -1,6 +1,9 @@
 import * as cheerio from 'cheerio'
 import { BAKEOFF_RULES, findBakeoffRule } from '../scoring/bakeoff-rules'
 import type { SuggestedEvent } from './types'
+import { matchContestantName } from './match-name'
+
+export { matchContestantName }
 
 /** name -> episode number -> raw cell text (e.g. "STAR BAKER", "OUT", "1st", "") */
 export type BakeoffSnapshot = Record<string, Record<string, string>>
@@ -73,21 +76,6 @@ const HANDSHAKE_PATTERN = /HANDSHAKE/i
 const HANDSHAKE_BG_PATTERN = /background(-color)?\s*:\s*(steelblue|#4682b4)\b/i
 const WINNER_PATTERN = /\bWINNER\b/i
 const BLANK_PATTERN = /^(TBA|--|-|)$/i
-
-/**
- * A wiki contestant name like "Clara Satchell-Silva" needs matching against
- * our DB's first-name-only contestant records ("Clara"). Exact matches win;
- * a whole-word prefix ("Clara" in "Clara Satchell-Silva") is next. Never a
- * bare substring prefix: "Mo" must not swallow "Moyin" or "Molly".
- */
-export function matchContestantName(wikiName: string, dbNames: string[]): string | undefined {
-  const firstToken = wikiName.split(/\s+/)[0]
-  const exact = dbNames.find((n) => n === wikiName) ?? dbNames.find((n) => n === firstToken)
-  if (exact) return exact
-  const wordPrefix = dbNames.filter((n) => wikiName.startsWith(`${n} `))
-  if (wordPrefix.length === 1) return wordPrefix[0]
-  return undefined
-}
 
 type CellEvent = Pick<SuggestedEvent, 'eventCode' | 'label' | 'points' | 'kind'>
 
