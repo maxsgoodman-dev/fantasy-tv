@@ -20,10 +20,22 @@ export function matchContestantName(wikiName: string, dbNames: string[]): string
   const byFirstName = unique(dbNames.filter((n) => norm(n) === firstToken))
   if (byFirstName) return byFirstName
 
-  return unique(
+  const byPrefix = unique(
     dbNames.filter((n) => {
       const d = norm(n)
       return w.startsWith(`${d} `) || d.startsWith(`${w} `)
+    })
+  )
+  if (byPrefix) return byPrefix
+
+  // Nickname vs full first name with the same surname: "Dom Monaghan" ↔ "Dominic Monaghan".
+  const [wFirst, ...wRest] = w.split(' ')
+  const wLast = wRest.join(' ')
+  if (!wLast) return undefined
+  return unique(
+    dbNames.filter((n) => {
+      const [dFirst, ...dRest] = norm(n).split(' ')
+      return dRest.join(' ') === wLast && (dFirst.startsWith(wFirst) || wFirst.startsWith(dFirst))
     })
   )
 }

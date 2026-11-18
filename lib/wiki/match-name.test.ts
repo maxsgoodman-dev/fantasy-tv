@@ -22,4 +22,9 @@ describe('matchContestantName', () => {
     expect(matchContestantName('Kim', ['Kim Daily', 'Kim Lee'])).toBeUndefined() // ambiguous: skip
     expect(matchContestantName('Lee', traitors)).toBeUndefined()
   })
+
+  it('matches a nickname to the full first name when the surname agrees', () => {
+    expect(matchContestantName('Dom Monaghan', ['Dominic Monaghan', 'Dominique Smith'])).toBe('Dominic Monaghan')
+    expect(matchContestantName('Dom Smith', ['Dominic Monaghan'])).toBeUndefined()
+  })
 })

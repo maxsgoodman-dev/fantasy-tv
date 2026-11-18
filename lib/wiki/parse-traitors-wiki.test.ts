@@ -54,3 +54,13 @@ describe('diffTraitorsSnapshots', () => {
     ])
   })
 })
+
+describe('Season 5 page layout', () => {
+  it('reads the contestants table when the name column is headed "Contestant"', () => {
+    const html = `<table>
+      <tr><th>Contestant</th><th>Occupation/ Notable For</th><th>Faction</th><th>Result</th><th>Exit Episode</th><th>Finish</th></tr>
+      <tr><td>Dom Monaghan</td><td>Actor</td><td>Faithful</td><td></td><td></td><td></td></tr>
+    </table>`
+    expect(Object.keys(parseTraitorsWiki(html))).toEqual(['Dom Monaghan'])
+  })
+})

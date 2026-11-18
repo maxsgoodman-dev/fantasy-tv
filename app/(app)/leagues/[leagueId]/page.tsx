@@ -25,12 +25,15 @@ function ContestantPhoto({ url, name }: { url: string | null; name: string }) {
 }
 
 function formatAirDate(iso: string) {
-  return new Date(iso).toLocaleString(undefined, {
+  // Rendered on the server (UTC), so pin the zone: the leagues watch on US Eastern time.
+  return new Date(iso).toLocaleString('en-US', {
     weekday: 'short',
     month: 'short',
     day: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
+    timeZone: 'America/New_York',
+    timeZoneName: 'short',
   })
 }
 

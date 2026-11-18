@@ -9,7 +9,7 @@ export type TraitorsSnapshot = Record<string, ContestantRow>
 
 /**
  * Parses the contestants table on a Traitors (US) Fandom season page:
- * Name / Age / Location / Occupation / Faction / Result / Exit Episode /
+ * Name (or Contestant) / Age / Location / Occupation / Faction / Result / Exit Episode /
  * Finish. Result + Exit Episode stay blank until a contestant is out.
  */
 export function parseTraitorsWiki(html: string): TraitorsSnapshot {
@@ -25,7 +25,8 @@ export function parseTraitorsWiki(html: string): TraitorsSnapshot {
       .map((_, el) => $(el).text().trim())
       .get()
 
-    const nameIdx = headerCells.findIndex((t) => /^Name/i.test(t))
+    // Older season pages label the column "Name"; Season 5 onward uses "Contestant".
+    const nameIdx = headerCells.findIndex((t) => /^(Name|Contestant)\b/i.test(t))
     const factionIdx = headerCells.findIndex((t) => /^Faction/i.test(t))
     const resultIdx = headerCells.findIndex((t) => /^Result/i.test(t))
     const exitEpIdx = headerCells.findIndex((t) => /^Exit Episode/i.test(t))
